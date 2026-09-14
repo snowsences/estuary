@@ -1,14 +1,16 @@
 const key='cream-corn-v1', monthLabels=['January','February','March','April','May','June','July','August','September','October','November','December'], round=n=>Math.round((Number(n)||0)*100)/100, maskDigits=value=>String(value).replace(/\d/g,'9'), num=x=>Number.isFinite(Number(x))?round(x):0;let displayMode=localStorage.getItem('cream-corn-display-mode')==='on',historyFilter='',money=n=>{const value=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(round(n));return displayMode?maskDigits(value):value};
-const defaultInvestmentAccounts=[{id:'ira',name:'IRA',annualGoal:0},{id:'401k-1',name:'401(k) 1',annualGoal:0},{id:'401k-2',name:'401(k) 2',annualGoal:0},{id:'brokerage',name:'Brokerage · VOO',annualGoal:0}];
-const starter={months:[['2026-01','January 2026'],['2026-02','February 2026'],['2026-03','March 2026'],['2026-04','April 2026']].map(([id,label])=>({id,label,water:0,electricity:0,gas:0,groceries:0,spending:0,cashOffset:0,notes:''})),entries:[],extraIncome:[],investments:[],settings:{monthlyIncome:7800,fixedExpenses:489,kevinMortgage:1250,foodShare:50,meganR1:0,meganR2:0,investmentAccounts:defaultInvestmentAccounts.map(account=>({...account}))},dropbox:{appKey:'',filePath:'/Budget.xlsx',accessToken:'',name:'',revision:'',rowMap:{}}};
+const defaultInvestmentAccounts=[{id:'ira',name:'IRA',annualGoal:0,currentTotal:0},{id:'401k-1',name:'401(k) 1',yearlyContribution:0,currentTotal:0},{id:'401k-2',name:'401(k) 2',yearlyContribution:0,currentTotal:0},{id:'brokerage',name:'Brokerage · VOO',annualGoal:0,currentTotal:0}];
+const starter={months:[['2026-01','January 2026'],['2026-02','February 2026'],['2026-03','March 2026'],['2026-04','April 2026']].map(([id,label])=>({id,label,water:0,electricity:0,gas:0,groceries:0,spending:0,cashOffset:0,notes:''})),entries:[],extraIncome:[],investments:[],accounts:[],settings:{monthlyIncome:7800,fixedExpenses:489,kevinMortgage:1250,foodShare:50,meganR1:0,meganR2:0,investmentAccounts:defaultInvestmentAccounts.map(account=>({...account}))},dropbox:{appKey:'',filePath:'/Budget.xlsx',accessToken:'',name:'',revision:'',rowMap:{}}};
 const safeText=(value,maxLength)=>String(value??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,' ').slice(0,maxLength),monthIdPattern=/^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])$/,safeMonthId=value=>monthIdPattern.test(String(value||''))?String(value):'',safeId=(value,prefix='item')=>{const id=String(value||'');return /^[A-Za-z0-9_-]{1,128}$/.test(id)?id:`${prefix}-${crypto.randomUUID()}`},safeDateTime=value=>{const text=String(value||'');return text.length<=40&&Number.isFinite(Date.parse(text))?new Date(text).toISOString():new Date().toISOString()},safeNumber=(value,min=-10000000,max=10000000)=>Math.max(min,Math.min(max,num(value)));
 const safeDateId=value=>{const text=String(value||'');if(!/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(text))return'';const parsed=new Date(`${text}T12:00:00Z`);return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===text?text:''};
 function normalizeMonthRecord(value,fallbackId=''){if(!value||typeof value!=='object'||Array.isArray(value))return null;const id=safeMonthId(value.id)||safeMonthId(fallbackId);if(!id)return null;const monthIndex=Number(id.slice(5,7))-1;return{id,label:`${monthLabels[monthIndex]} ${id.slice(0,4)}`,water:safeNumber(value.water),electricity:safeNumber(value.electricity),gas:safeNumber(value.gas),groceries:safeNumber(value.groceries),spending:safeNumber(value.spending),cashOffset:safeNumber(value.cashOffset),notes:safeText(value.notes,500)}}
 function normalizeExpenseRecord(value,fallbackId=''){if(!value||typeof value!=='object'||Array.isArray(value))return null;const month=safeMonthId(value.month),types=['Spending','Water','Electricity','Gas','Groceries'];if(!month||!types.includes(value.type))return null;const categories=['Groceries','Restaurants','Shopping'],subcategories=['','Dining','Entertainment','Travel','Health','Pets','Misc'];const entry={id:safeId(value.id||fallbackId,'expense'),type:value.type,month,original:safeNumber(value.original,0),modifier:safeNumber(value.modifier,.9,1),final:safeNumber(value.final,0),comment:safeText(value.comment,500),createdAt:safeDateTime(value.createdAt)};if(categories.includes(value.category))entry.category=value.category;if(subcategories.includes(value.subcategory))entry.subcategory=value.subcategory;if(value.updatedAt)entry.updatedAt=safeDateTime(value.updatedAt);return entry}
 function normalizeExtraIncomeRecord(value,fallbackId=''){if(!value||typeof value!=='object'||Array.isArray(value))return null;const month=safeMonthId(value.month),categories=['Signup Bonus','Gift','Misc'];if(!month||!categories.includes(value.category))return null;const entry={id:safeId(value.id||fallbackId,'income'),month,amount:safeNumber(value.amount,0),category:value.category,description:safeText(value.description,300),createdAt:safeDateTime(value.createdAt)};if(value.updatedAt)entry.updatedAt=safeDateTime(value.updatedAt);return entry.amount>0?entry:null}
-function normalizeInvestmentRecord(value,fallbackId=''){if(!value||typeof value!=='object'||Array.isArray(value))return null;const date=safeDateId(value.date),types=['Your contribution','Employer match','Employer contribution'],accountId=String(value.accountId||'');if(!date||!types.includes(value.contributionType)||!defaultInvestmentAccounts.some(account=>account.id===accountId))return null;const entry={id:safeId(value.id||fallbackId,'investment'),accountId,date,amount:safeNumber(value.amount,0),contributionType:value.contributionType,description:safeText(value.description,300),createdAt:safeDateTime(value.createdAt)};if(value.updatedAt)entry.updatedAt=safeDateTime(value.updatedAt);return entry.amount>0?entry:null}
-function normalizeSettings(value){const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{},settings={monthlyIncome:safeNumber(source.monthlyIncome??starter.settings.monthlyIncome,0),fixedExpenses:safeNumber(source.fixedExpenses??starter.settings.fixedExpenses,0),kevinMortgage:safeNumber(source.kevinMortgage??starter.settings.kevinMortgage,0),foodShare:safeNumber(source.foodShare??starter.settings.foodShare,0,100),meganR1:safeNumber(source.meganR1??starter.settings.meganR1),meganR2:safeNumber(source.meganR2??starter.settings.meganR2)};if(Array.isArray(source.fixedExpenseItems))settings.fixedExpenseItems=source.fixedExpenseItems.slice(0,100).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)).map(item=>({id:safeId(item.id,'fixed'),label:safeText(item.label||'Expense',80),amount:safeNumber(item.amount)}));if(Array.isArray(source.incomeLevels))settings.incomeLevels=source.incomeLevels.slice(0,100).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)&&safeMonthId(item.start)).map(item=>({id:safeId(item.id,'income'),start:safeMonthId(item.start),end:safeMonthId(item.end),paycheck:safeNumber(item.paycheck,0)}));const accountSource=Array.isArray(source.investmentAccounts)?source.investmentAccounts:[];settings.investmentAccounts=defaultInvestmentAccounts.map(account=>{const saved=accountSource.find(item=>item&&item.id===account.id)||{};return{id:account.id,name:safeText(saved.name||account.name,60),annualGoal:safeNumber(saved.annualGoal??account.annualGoal,0)}});if(typeof source.incomeHistoryLocked==='boolean')settings.incomeHistoryLocked=source.incomeHistoryLocked;if(safeMonthId(source.meganReminderSeen))settings.meganReminderSeen=safeMonthId(source.meganReminderSeen);return settings}
-function normalizeAppData(value){const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{},months=Array.isArray(source.months)?source.months.slice(0,240).map(month=>normalizeMonthRecord(month)).filter(Boolean):[];return{months,entries:Array.isArray(source.entries)?source.entries.slice(0,10000).map(entry=>normalizeExpenseRecord(entry)).filter(Boolean):[],extraIncome:Array.isArray(source.extraIncome)?source.extraIncome.slice(0,10000).map(entry=>normalizeExtraIncomeRecord(entry)).filter(Boolean):[],investments:Array.isArray(source.investments)?source.investments.slice(0,20000).map(entry=>normalizeInvestmentRecord(entry)).filter(Boolean):[],settings:normalizeSettings(source.settings)}}
+function normalizeInvestmentRecord(value,fallbackId=''){if(!value||typeof value!=='object'||Array.isArray(value))return null;const date=safeDateId(value.date),accountId=String(value.accountId||'');if(!date||value.contributionType!=='Your contribution'||!defaultInvestmentAccounts.some(account=>account.id===accountId))return null;const hasCurrentTotal=value.currentTotal!==undefined&&value.currentTotal!==null&&value.currentTotal!=='';const entry={id:safeId(value.id||fallbackId,'investment'),accountId,date,amount:safeNumber(value.amount,0),contributionType:'Your contribution',description:safeText(value.description,300),createdAt:safeDateTime(value.createdAt)};if(hasCurrentTotal)entry.currentTotal=safeNumber(value.currentTotal,0);if(value.updatedAt)entry.updatedAt=safeDateTime(value.updatedAt);return entry.amount>0||hasCurrentTotal?entry:null}
+function sanitizeAccountSvgMarkup(value){const text=String(value||'').trim();if(!text||new TextEncoder().encode(text).length>100000)return'';const documentNode=new DOMParser().parseFromString(text,'image/svg+xml'),root=documentNode.documentElement;if(root.localName!=='svg'||documentNode.querySelector('parsererror'))return'';const allowed=new Set(['svg','g','path','rect','circle','ellipse','line','polyline','polygon','text','tspan','defs','linearGradient','radialGradient','stop','clipPath','mask','filter','feGaussianBlur','feOffset','feBlend','feColorMatrix','feFlood','feComposite','title','desc']);[...root.querySelectorAll('*')].forEach(element=>{if(!allowed.has(element.localName)){element.remove();return}[...element.attributes].forEach(attribute=>{const name=attribute.name.toLowerCase(),content=attribute.value.toLowerCase(),unsafeUrl=/url\((?!\s*['"]?#)/i.test(attribute.value);if(name.startsWith('on')||name==='href'||name==='xlink:href'||content.includes('javascript:')||content.includes('@import')||content.includes('expression(')||unsafeUrl)element.removeAttribute(attribute.name)})});[...root.attributes].forEach(attribute=>{const name=attribute.name.toLowerCase(),content=attribute.value.toLowerCase();if(name.startsWith('on')||name==='href'||name==='xlink:href'||content.includes('javascript:')||content.includes('@import')||content.includes('expression(')||/url\((?!\s*['"]?#)/i.test(attribute.value))root.removeAttribute(attribute.name)});root.setAttribute('xmlns','http://www.w3.org/2000/svg');const cleaned=new XMLSerializer().serializeToString(root);return new TextEncoder().encode(cleaned).length<=100000?cleaned:''}
+function normalizeAccountRecord(value,fallbackId=''){if(!value||typeof value!=='object'||Array.isArray(value))return null;const kinds=['Credit Card','Bank Account'],statuses=['Active','Closed'],name=safeText(value.name,80).trim();if(!name||!kinds.includes(value.kind))return null;const record={id:safeId(value.id||fallbackId,'account'),kind:value.kind,name,institution:safeText(value.institution,80).trim(),use:safeText(value.use,500).trim(),signupBonus:safeText(value.signupBonus,1000).trim(),status:statuses.includes(value.status)?value.status:'Active',imageSvg:sanitizeAccountSvgMarkup(value.imageSvg),createdAt:safeDateTime(value.createdAt)};if(value.updatedAt)record.updatedAt=safeDateTime(value.updatedAt);return record}
+function normalizeSettings(value){const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{},settings={monthlyIncome:safeNumber(source.monthlyIncome??starter.settings.monthlyIncome,0),fixedExpenses:safeNumber(source.fixedExpenses??starter.settings.fixedExpenses,0),kevinMortgage:safeNumber(source.kevinMortgage??starter.settings.kevinMortgage,0),foodShare:safeNumber(source.foodShare??starter.settings.foodShare,0,100),meganR1:safeNumber(source.meganR1??starter.settings.meganR1),meganR2:safeNumber(source.meganR2??starter.settings.meganR2)};if(Array.isArray(source.fixedExpenseItems))settings.fixedExpenseItems=source.fixedExpenseItems.slice(0,100).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)).map(item=>({id:safeId(item.id,'fixed'),label:safeText(item.label||'Expense',80),amount:safeNumber(item.amount)}));if(Array.isArray(source.incomeLevels))settings.incomeLevels=source.incomeLevels.slice(0,100).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)&&safeMonthId(item.start)).map(item=>({id:safeId(item.id,'income'),start:safeMonthId(item.start),end:safeMonthId(item.end),paycheck:safeNumber(item.paycheck,0)}));const accountSource=Array.isArray(source.investmentAccounts)?source.investmentAccounts:[];settings.investmentAccounts=defaultInvestmentAccounts.map(account=>{const saved=accountSource.find(item=>item&&item.id===account.id)||{},is401k=account.id.startsWith('401k-');return{id:account.id,name:safeText(saved.name||account.name,60),annualGoal:is401k?0:safeNumber(saved.annualGoal??account.annualGoal,0),yearlyContribution:is401k?safeNumber(saved.yearlyContribution??saved.annualGoal??account.yearlyContribution,0):0,currentTotal:safeNumber(saved.currentTotal??account.currentTotal,0)}});if(typeof source.incomeHistoryLocked==='boolean')settings.incomeHistoryLocked=source.incomeHistoryLocked;if(safeMonthId(source.meganReminderSeen))settings.meganReminderSeen=safeMonthId(source.meganReminderSeen);return settings}
+function normalizeAppData(value){const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{},months=Array.isArray(source.months)?source.months.slice(0,240).map(month=>normalizeMonthRecord(month)).filter(Boolean):[];return{months,entries:Array.isArray(source.entries)?source.entries.slice(0,10000).map(entry=>normalizeExpenseRecord(entry)).filter(Boolean):[],extraIncome:Array.isArray(source.extraIncome)?source.extraIncome.slice(0,10000).map(entry=>normalizeExtraIncomeRecord(entry)).filter(Boolean):[],investments:Array.isArray(source.investments)?source.investments.slice(0,20000).map(entry=>normalizeInvestmentRecord(entry)).filter(Boolean):[],accounts:Array.isArray(source.accounts)?source.accounts.slice(0,100).map(entry=>normalizeAccountRecord(entry)).filter(Boolean):[],settings:normalizeSettings(source.settings)}}
 let storedData=null;try{storedData=JSON.parse(localStorage.getItem(key)||'null')}catch(error){console.warn('Ignored invalid local budget data.',error)}let data=normalizeAppData(storedData||starter);const currentYear=new Date().getFullYear();function ensureYear(year){for(let i=0;i<12;i++){const id=`${year}-${String(i+1).padStart(2,'0')}`;if(!data.months.some(month=>month.id===id))data.months.push({id,label:`${monthLabels[i]} ${year}`,water:0,electricity:0,gas:0,groceries:0,spending:0,cashOffset:0,notes:''})}}ensureYear(currentYear);ensureYear(currentYear+1);data.months.sort((a,b)=>a.id.localeCompare(b.id));let active=data.months.find(month=>month.id.startsWith(String(currentYear)))?.id||data.months.at(-1).id,selectedYear=String(currentYear); const save=()=>localStorage.setItem(key,JSON.stringify(data));
 function total(m){const s=data.settings,utilities=m.water+m.electricity+m.gas,kevinFood=m.groceries*s.foodShare/100,megan=m.groceries*(1-s.foodShare/100)+s.meganR1+s.meganR2,expenses=s.fixedExpenses+s.kevinMortgage+utilities+kevinFood-m.cashOffset;return{utilities,megan,expenses,saved:s.monthlyIncome-expenses-m.spending}};
 function monthTable(months){return `<div class="table-wrap"><table class="table"><thead><tr><th>Month</th><th>Water</th><th>Electricity</th><th>Gas</th><th>Groceries</th><th>Spending</th><th>Megan owes</th><th>Saved</th><th aria-label="Actions"></th></tr></thead><tbody>${months.map(x=>{const q=total(x);return `<tr><th>${x.label}</th>${['water','electricity','gas','groceries'].map(k=>`<td><input type="number" data-month="${x.id}" data-key="${k}" value="${round(x[k])}"></td>`).join('')}<td><div class="spending-cell"><input type="number" data-month="${x.id}" data-key="spending" value="${round(x.spending)}"><button class="notes-button ${x.notes?'has-notes':''}" data-notes-month="${x.id}" aria-label="Edit notes for ${x.label}" title="${x.notes?'Edit notes':'Add notes'}">▤</button></div></td><td class="megan">${money(q.megan)}</td><td class="saved">${money(q.saved)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${x.id}">Add cash offset</button></div></details></td></tr>`}).join('')}</tbody></table></div>`}
@@ -30,7 +32,9 @@ async function updateCloudExtraIncome(previous,entry){if(!firebaseClient||!fireb
 async function deleteCloudExtraIncome(entry){if(!firebaseClient||!firebaseUser)return;const monthRef=firebaseClient.doc(firebaseClient.db,...firebasePath('months'),entry.month),incomeRef=firebaseClient.doc(firebaseClient.db,...firebasePath('extraIncome'),entry.id);try{await firebaseClient.runTransaction(firebaseClient.db,async transaction=>{const snapshot=await transaction.get(monthRef),remote=cleanMonth(snapshot.exists()?snapshot.data():freshMonth(entry.month));remote.spending=round(remote.spending+entry.amount);transaction.set(monthRef,{...remote,updatedAt:new Date().toISOString()});transaction.delete(incomeRef)})}catch(error){console.error(error);firebaseStatusMessage('Could not delete this extra income from sync yet. It remains removed on this device.')}}
 async function syncInvestmentRecord(entry){if(!firebaseClient||!firebaseUser)return;try{await firebaseClient.setDoc(firebaseClient.doc(firebaseClient.db,...firebasePath('investments'),entry.id),entry)}catch(error){console.error(error);firebaseStatusMessage('Could not sync this investment yet. It remains saved on this device.')}}
 async function deleteCloudInvestment(id){if(!firebaseClient||!firebaseUser)return;try{await firebaseClient.deleteDoc(firebaseClient.doc(firebaseClient.db,...firebasePath('investments'),id))}catch(error){console.error(error);firebaseStatusMessage('Could not delete this investment from sync yet. It remains removed on this device.')}}
-async function migrateLocalData(){const monthsCollection=firebaseClient.collection(firebaseClient.db,...firebasePath('months')),existing=await firebaseClient.getDocs(monthsCollection);if(!existing.empty)return false;await syncSettings();await Promise.all(data.months.map(syncMonth));await Promise.all(data.entries.map(entry=>{const id=entry.id||crypto.randomUUID();return firebaseClient.setDoc(firebaseClient.doc(firebaseClient.db,...firebasePath('expenses'),id),{...entry,id})}));await Promise.all(data.extraIncome.map(syncExtraIncomeRecord));await Promise.all(data.investments.map(syncInvestmentRecord));return true}
+async function syncAccountRecord(entry){if(!firebaseClient||!firebaseUser)return;try{await firebaseClient.setDoc(firebaseClient.doc(firebaseClient.db,...firebasePath('accounts'),entry.id),entry)}catch(error){console.error(error);firebaseStatusMessage('Could not sync this account yet. It remains saved on this device.')}}
+async function deleteCloudAccount(id){if(!firebaseClient||!firebaseUser)return;try{await firebaseClient.deleteDoc(firebaseClient.doc(firebaseClient.db,...firebasePath('accounts'),id))}catch(error){console.error(error);firebaseStatusMessage('Could not delete this account from sync yet. It remains removed on this device.')}}
+async function migrateLocalData(){const monthsCollection=firebaseClient.collection(firebaseClient.db,...firebasePath('months')),existing=await firebaseClient.getDocs(monthsCollection);if(!existing.empty)return false;await syncSettings();await Promise.all(data.months.map(syncMonth));await Promise.all(data.entries.map(entry=>{const id=entry.id||crypto.randomUUID();return firebaseClient.setDoc(firebaseClient.doc(firebaseClient.db,...firebasePath('expenses'),id),{...entry,id})}));await Promise.all(data.extraIncome.map(syncExtraIncomeRecord));await Promise.all(data.investments.map(syncInvestmentRecord));await Promise.all(data.accounts.map(syncAccountRecord));return true}
 function stopFirebaseListeners(){firebaseUnsubscribers.forEach(stop=>stop());firebaseUnsubscribers=[]}
 function subscribeFirebase(){
   stopFirebaseListeners();
@@ -39,11 +43,13 @@ function subscribeFirebase(){
   const entriesRef=firebaseClient.collection(firebaseClient.db,...firebasePath('expenses'));
   const extraIncomeRef=firebaseClient.collection(firebaseClient.db,...firebasePath('extraIncome'));
   const investmentsRef=firebaseClient.collection(firebaseClient.db,...firebasePath('investments'));
+  const accountsRef=firebaseClient.collection(firebaseClient.db,...firebasePath('accounts'));
   firebaseUnsubscribers.push(firebaseClient.onSnapshot(settingsRef,snapshot=>{if(snapshot.exists()&&snapshot.data().settings){const remote=snapshot.data(),remoteUpdatedAt=settingsTimestamp(remote.updatedAt);if(remoteUpdatedAt&&remoteUpdatedAt<latestLocalSettingsUpdate)return;latestLocalSettingsUpdate=Math.max(latestLocalSettingsUpdate,remoteUpdatedAt);data.settings=normalizeSettings({...data.settings,...remote.settings});save();render()}}));
   firebaseUnsubscribers.push(firebaseClient.onSnapshot(monthsRef,snapshot=>{if(!snapshot.empty){const merged=new Map(data.months.map(month=>[month.id,month]));snapshot.docs.forEach(record=>{const remote=normalizeMonthRecord(record.data(),record.id);if(!remote)return;merged.set(remote.id,{...(merged.get(remote.id)||freshMonth(remote.id)),...remote})});data.months=[...merged.values()].sort((a,b)=>a.id.localeCompare(b.id));ensureYear(currentYear);ensureYear(currentYear+1);save();render()}}));
   firebaseUnsubscribers.push(firebaseClient.onSnapshot(entriesRef,snapshot=>{data.entries=snapshot.docs.map(record=>normalizeExpenseRecord(record.data(),record.id)).filter(Boolean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));save();render()}));
   firebaseUnsubscribers.push(firebaseClient.onSnapshot(extraIncomeRef,snapshot=>{data.extraIncome=snapshot.docs.map(record=>normalizeExtraIncomeRecord(record.data(),record.id)).filter(Boolean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));save();render()}));
   firebaseUnsubscribers.push(firebaseClient.onSnapshot(investmentsRef,snapshot=>{data.investments=snapshot.docs.map(record=>normalizeInvestmentRecord(record.data(),record.id)).filter(Boolean).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));save();render()}));
+  firebaseUnsubscribers.push(firebaseClient.onSnapshot(accountsRef,snapshot=>{data.accounts=snapshot.docs.map(record=>normalizeAccountRecord(record.data(),record.id)).filter(Boolean).sort((a,b)=>String(a.name).localeCompare(String(b.name)));save();render()}));
 }
 function clearPrivateLocalData(){localStorage.removeItem(key);data=normalizeAppData(starter);ensureYear(currentYear);ensureYear(currentYear+1);data.months.sort((a,b)=>a.id.localeCompare(b.id));active=data.months.find(month=>month.id===currentMonthKey())?.id||data.months.at(-1).id;selectedYear=String(currentYear)}
 async function onFirebaseUser(user){firebaseUser=user;if(!user){stopFirebaseListeners();if(clearPrivateDataAfterAuthChange){clearPrivateLocalData();clearPrivateDataAfterAuthChange=false}firebaseStatusMessage('Firebase connected. Sign in with Google to sync your private budget.');return}if(user.uid!==ownerUid){stopFirebaseListeners();firebaseStatusMessage('This Google account is not authorized for Estuary.');clearPrivateDataAfterAuthChange=true;await firebaseClient.signOut(firebaseClient.auth);return}firebaseStatusMessage('Syncing as '+(user.email||'your Google account')+'…');try{const moved=await migrateLocalData();subscribeFirebase();firebaseStatusMessage(moved?'Local budget moved to Firebase and now syncing.':'Synced as '+(user.email||'your Google account')+'.')}catch(error){console.error(error);firebaseStatusMessage('Firebase connected, but the first sync failed. Check your Firestore rules.')}}
@@ -1372,9 +1378,9 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     const dialog = document.getElementById('investmentDialog');
     const form = document.getElementById('investmentForm');
     const amountInput = document.getElementById('investmentAmount');
+    const currentTotalInput = document.getElementById('investmentCurrentTotal');
     const dateInput = document.getElementById('investmentDate');
     const accountInput = document.getElementById('investmentAccount');
-    const typeInput = document.getElementById('investmentType');
     const descriptionInput = document.getElementById('investmentDescription');
     const dialogTitle = document.getElementById('investmentDialogTitle');
     const saveButton = document.getElementById('saveInvestment');
@@ -1383,34 +1389,75 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     const editIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg>';
     const deleteIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg>';
     let editingInvestmentId = '';
+    const accountColors = ['#35b9b1','#efb43b','#779fc2','#f0845c'];
 
     const accountById = id => data.settings.investmentAccounts.find(account => account.id === id);
+    const is401k = account => account?.id.startsWith('401k-');
     const localToday = () => {
       const now = new Date();
       return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     };
-    const isEmployerMoney = entry => entry.contributionType !== 'Your contribution';
+    const yourRecords = () => data.investments.filter(entry => entry.contributionType === 'Your contribution');
+    const latestBalanceRecord = accountId => yourRecords()
+      .filter(entry => entry.accountId === accountId && Number.isFinite(Number(entry.currentTotal)))
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)))[0];
+    const currentAccountTotal = account => num(latestBalanceRecord(account.id)?.currentTotal ?? account.currentTotal);
+    const accountYearContribution = (account,year) => {
+      if (is401k(account)) {
+        const current = new Date(),monthCount=String(current.getFullYear())===year?current.getMonth()+1:12;
+        return round(num(account.yearlyContribution)/12*monthCount);
+      }
+      return round(yourRecords().filter(entry=>entry.accountId===account.id&&entry.date.startsWith(year)).reduce((sum,entry)=>sum+entry.amount,0));
+    };
+    const monthName = index => monthLabels[index].slice(0,3);
+    const contributionPoints = (account,year) => Array.from({length:12},(_,index)=>{
+      const month=`${year}-${String(index+1).padStart(2,'0')}`;
+      const value=is401k(account)?round(num(account.yearlyContribution)/12):round(yourRecords().filter(entry=>entry.accountId===account.id&&entry.date.startsWith(month)).reduce((sum,entry)=>sum+entry.amount,0));
+      return {label:`${monthName(index)} ${year}`,value};
+    });
+    const balancePoints = account => {
+      const byDate=new Map();
+      yourRecords().filter(entry=>entry.accountId===account.id&&Number.isFinite(Number(entry.currentTotal))).sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.updatedAt||a.createdAt).localeCompare(String(b.updatedAt||b.createdAt))).forEach(entry=>byDate.set(entry.date,{label:new Date(`${entry.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',year:'2-digit'}),value:num(entry.currentTotal)}));
+      if(!byDate.size&&num(account.currentTotal)>0)byDate.set(localToday(),{label:'Current',value:num(account.currentTotal)});
+      return [...byDate.values()];
+    };
+    const axisMoney = value => {
+      const absolute=Math.abs(value);
+      const formatted=absolute>=1000000?`${round(value/1000000)}M`:absolute>=1000?`${round(value/1000)}k`:String(round(value));
+      return displayMode?maskDigits(`$${formatted}`):`$${formatted}`;
+    };
+    const investmentLineChart = (points,color,label) => {
+      if(!points.length)return '<div class="investment-chart-empty">Add a current total to begin this graph.</div>';
+      const width=520,height=180,left=48,right=12,top=12,bottom=28,plotWidth=width-left-right,plotHeight=height-top-bottom,max=Math.max(1,...points.map(point=>point.value)),x=index=>points.length===1?left+plotWidth/2:left+index*plotWidth/(points.length-1),y=value=>top+(max-value)*plotHeight/max,path=points.map((point,index)=>`${index?'L':'M'} ${x(index).toFixed(1)} ${y(point.value).toFixed(1)}`).join(' '),indexes=[...new Set([0,Math.floor((points.length-1)/2),points.length-1])];
+      return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}"><defs><linearGradient id="investment-fill-${accountColors.indexOf(color)}-${points.length}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".2"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${[max,max/2,0].map(value=>`<g><line class="investment-chart-grid" x1="${left}" x2="${width-right}" y1="${y(value)}" y2="${y(value)}"/><text class="investment-chart-axis" x="${left-7}" y="${y(value)+4}" text-anchor="end">${axisMoney(value)}</text></g>`).join('')}<path d="${path} L ${x(points.length-1)} ${height-bottom} L ${x(0)} ${height-bottom} Z" fill="url(#investment-fill-${accountColors.indexOf(color)}-${points.length})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${points.map((point,index)=>`<circle cx="${x(index)}" cy="${y(point.value)}" r="4" fill="${color}"><title>${escapeHtml(point.label)}: ${money(point.value)}</title></circle>`).join('')}${indexes.map(index=>`<text class="investment-chart-axis" x="${x(index)}" y="${height-8}" text-anchor="middle">${escapeHtml(points[index].label)}</text>`).join('')}</svg>`;
+    };
+    const pieStyle = values => {
+      const total=values.reduce((sum,value)=>sum+value,0);
+      if(!total)return 'var(--soft)';
+      let start=0;
+      return `conic-gradient(${values.map((value,index)=>{const from=start;start+=value/total*100;return `${accountColors[index]} ${from}% ${start}%`}).join(',')})`;
+    };
+    const pieCard = (title,subtitle,values) => {
+      const total=round(values.reduce((sum,value)=>sum+value,0));
+      return `<article class="investment-summary-card"><div><h3>${title}</h3><p>${subtitle}</p><div class="investment-legend">${data.settings.investmentAccounts.map((account,index)=>`<span><i style="--legend-color:${accountColors[index]}"></i>${escapeHtml(account.name)} · ${money(values[index])}</span>`).join('')}</div></div><div class="investment-donut" style="--investment-pie:${pieStyle(values)}" role="img" aria-label="${escapeHtml(title)}: ${money(total)}"><strong class="investment-donut-total">${money(total)}</strong></div></article>`;
+    };
     const selectInvestmentAccount = id => {
       accountInput.value = id;
       document.querySelectorAll('[data-investment-account]').forEach(button => button.classList.toggle('selected',button.dataset.investmentAccount === id));
     };
-    const selectInvestmentType = type => {
-      typeInput.value = type;
-      document.querySelectorAll('[data-investment-type]').forEach(button => button.classList.toggle('selected',button.dataset.investmentType === type));
-    };
     const renderAccountOptions = () => {
       const host = document.getElementById('investmentAccountOptions');
-      host.innerHTML = data.settings.investmentAccounts.map(account => `<button type="button" class="choice-option" data-investment-account="${account.id}">${escapeHtml(account.name)}</button>`).join('');
+      host.innerHTML = data.settings.investmentAccounts.filter(account=>!is401k(account)).map(account => `<button type="button" class="choice-option" data-investment-account="${account.id}">${escapeHtml(account.name)}</button>`).join('');
     };
     const openInvestment = (entryId = '') => {
       const entry = entryId ? data.investments.find(item => item.id === entryId) : null;
       editingInvestmentId = entry?.id || '';
       renderAccountOptions();
       amountInput.value = entry ? round(entry.amount) : '';
+      currentTotalInput.value = entry&&Number.isFinite(Number(entry.currentTotal)) ? round(entry.currentTotal) : round(currentAccountTotal(accountById(entry?.accountId||'ira')));
       dateInput.value = entry?.date || localToday();
       descriptionInput.value = entry?.description || '';
-      selectInvestmentAccount(entry?.accountId || data.settings.investmentAccounts[0].id);
-      selectInvestmentType(entry?.contributionType || 'Your contribution');
+      selectInvestmentAccount(entry?.accountId || data.settings.investmentAccounts.find(account=>!is401k(account))?.id || 'ira');
       dialogTitle.textContent = entry ? 'Edit investment' : 'Add investment';
       saveButton.textContent = entry ? 'Save changes' : 'Add investment';
       dialog.showModal();
@@ -1419,20 +1466,17 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     const renderInvestments = () => {
       if (!section) return;
       const today = localToday(),year=today.slice(0,4),month=today.slice(0,7);
-      const thisYear = data.investments.filter(entry => entry.date.startsWith(year));
-      const yourYear = thisYear.filter(entry => !isEmployerMoney(entry)).reduce((sum,entry)=>sum+entry.amount,0);
-      const yourMonth = thisYear.filter(entry => !isEmployerMoney(entry)&&entry.date.startsWith(month)).reduce((sum,entry)=>sum+entry.amount,0);
-      const employerYear = thisYear.filter(isEmployerMoney).reduce((sum,entry)=>sum+entry.amount,0);
-      const totalYear = yourYear+employerYear;
-      summary.innerHTML = [['You · this month',yourMonth],['You · this year',yourYear],['Employer · this year',employerYear],['Total invested · this year',totalYear]].map(([label,value])=>`<article class="investment-summary-card"><span>${label}</span><strong>${money(value)}</strong></article>`).join('');
-      accountGrid.innerHTML = data.settings.investmentAccounts.map(account => {
-        const records=thisYear.filter(entry=>entry.accountId===account.id),yourTotal=records.filter(entry=>!isEmployerMoney(entry)).reduce((sum,entry)=>sum+entry.amount,0),employerTotal=records.filter(isEmployerMoney).reduce((sum,entry)=>sum+entry.amount,0),total=yourTotal+employerTotal,share=totalYear?Math.round(total/totalYear*100):0,goal=num(account.annualGoal),progress=goal?Math.min(100,total/goal*100):0;
-        return `<article class="investment-account-card"><h3>${escapeHtml(account.name)}</h3><strong>${money(total)}</strong><p>${share}% of this year’s investments</p><p>You ${money(yourTotal)} · Employer ${money(employerTotal)}</p>${goal?`<div class="investment-progress" aria-label="${Math.round(progress)}% of annual goal"><i style="width:${progress}%"></i></div><p class="investment-goal-label"><span>${Math.round(progress)}% of goal</span><span>${money(goal)}</span></p>`:'<p class="investment-goal-label"><span>No annual goal set</span></p>'}</article>`;
+      const yearValues=data.settings.investmentAccounts.map(account=>accountYearContribution(account,year));
+      const balanceValues=data.settings.investmentAccounts.map(currentAccountTotal);
+      summary.innerHTML = pieCard('Invested This Year',`Contributions through ${new Date(`${month}-01T12:00:00`).toLocaleDateString('en-US',{month:'long'})}`,yearValues)+pieCard('Total Invested','Latest current totals',balanceValues);
+      accountGrid.innerHTML = data.settings.investmentAccounts.map((account,index) => {
+        const yearContribution=yearValues[index],currentTotal=balanceValues[index],goal=is401k(account)?num(account.yearlyContribution):num(account.annualGoal),progress=goal?Math.min(100,yearContribution/goal*100):0,goalLabel=is401k(account)?'Yearly contribution':'Annual goal',contributionData=contributionPoints(account,year),balanceData=balancePoints(account),color=accountColors[index];
+        return `<article class="investment-account-card"><div class="investment-account-info"><h3>${escapeHtml(account.name)}</h3><div class="investment-account-stats"><span class="investment-account-stat"><span>Contributed this year</span><strong>${money(yearContribution)}</strong></span><span class="investment-account-stat"><span>Current total</span><strong>${money(currentTotal)}</strong></span><span class="investment-account-stat"><span>${goalLabel}</span><strong>${goal?money(goal):'Not set'}</strong></span></div></div>${goal?`<div class="investment-progress" aria-label="${Math.round(progress)}% of ${goalLabel.toLowerCase()}"><i style="width:${progress}%;background:${color}"></i></div><p class="investment-goal-label"><span>${Math.round(progress)}%</span><span>${money(goal)}</span></p>`:''}<div class="investment-account-charts"><section class="investment-chart"><h4>Contributions · ${year}</h4><p>${is401k(account)?'Monthly amount inferred from Yearly Contribution':'Monthly contributions'}</p>${investmentLineChart(contributionData,color,`${account.name} monthly contributions for ${year}`)}</section><section class="investment-chart"><h4>Total amount</h4><p>Balance updates over time</p>${investmentLineChart(balanceData,color,`${account.name} total balance over time`)}</section></div></article>`;
       }).join('');
-      const sorted=[...data.investments].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
+      const sorted=yourRecords().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.createdAt).localeCompare(String(a.createdAt)));
       count.textContent=`${sorted.length} contribution${sorted.length===1?'':'s'}`;
-      entriesHost.innerHTML=sorted.length?sorted.map(entry=>{const account=accountById(entry.accountId),date=new Date(`${entry.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});return `<article class="history-entry investment-entry"><span class="history-date"><b>${date}</b><time>${entry.contributionType}</time></span><span class="history-kind"><b>${escapeHtml(account?.name||'Account')}</b><span>${isEmployerMoney(entry)?'Employer':'You'}</span></span><b class="history-final">${money(entry.amount)}</b><div class="history-actions"><button type="button" class="history-icon-button" data-edit-investment="${entry.id}" aria-label="Edit investment">${editIcon}</button><button type="button" class="history-icon-button history-delete" data-delete-investment="${entry.id}" aria-label="Delete investment">${deleteIcon}</button></div>${entry.description?`<p class="history-comment">${escapeHtml(entry.description)}</p>`:''}</article>`}).join(''):'<div class="chart-empty">Investments you add will appear here.</div>';
-      settingsHost.innerHTML=data.settings.investmentAccounts.map(account=>`<div class="investment-settings-row"><label>Account name<input type="text" maxlength="60" value="${escapeHtml(account.name)}" data-investment-setting="name" data-investment-account-id="${account.id}"></label><label>Annual goal<input type="number" min="0" step="0.01" inputmode="decimal" value="${round(account.annualGoal)}" data-investment-setting="annualGoal" data-investment-account-id="${account.id}"></label></div>`).join('');
+      entriesHost.innerHTML=sorted.length?sorted.map(entry=>{const account=accountById(entry.accountId),date=new Date(`${entry.date}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),balance=Number.isFinite(Number(entry.currentTotal))?`<span>Current total ${money(entry.currentTotal)}</span>`:'';return `<article class="history-entry investment-entry"><span class="history-date"><b>${date}</b><time>Your contribution</time></span><span class="history-kind"><b>${escapeHtml(account?.name||'Account')}</b>${balance}</span><b class="history-final">${money(entry.amount)}</b><div class="history-actions">${is401k(account)?'':`<button type="button" class="history-icon-button" data-edit-investment="${entry.id}" aria-label="Edit investment">${editIcon}</button>`}<button type="button" class="history-icon-button history-delete" data-delete-investment="${entry.id}" aria-label="Delete investment">${deleteIcon}</button></div>${entry.description?`<p class="history-comment">${escapeHtml(entry.description)}</p>`:''}</article>`}).join(''):'<div class="chart-empty">Investments you add will appear here.</div>';
+      settingsHost.innerHTML=data.settings.investmentAccounts.map(account=>`<div class="investment-settings-row"><label>Account name<input type="text" maxlength="60" value="${escapeHtml(account.name)}" data-investment-setting="name" data-investment-account-id="${account.id}"></label><label>${is401k(account)?'Yearly Contribution':'Annual goal'}<input type="number" min="0" step="0.01" inputmode="decimal" value="${round(is401k(account)?account.yearlyContribution:account.annualGoal)}" data-investment-setting="${is401k(account)?'yearlyContribution':'annualGoal'}" data-investment-account-id="${account.id}"></label><label>Current total<input type="number" min="0" step="0.01" inputmode="decimal" value="${round(currentAccountTotal(account))}" data-investment-setting="currentTotal" data-investment-account-id="${account.id}" ${is401k(account)?'':'disabled aria-label="Current total is updated when adding a contribution"'}></label></div>`).join('');
     };
     const syncHeaderAction = () => {
       if (!headerAction) return;
@@ -1446,26 +1490,26 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       }
     };
 
-    document.getElementById('investmentAccountOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-investment-account]');if(button)selectInvestmentAccount(button.dataset.investmentAccount)});
-    document.getElementById('investmentTypeOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-investment-type]');if(button)selectInvestmentType(button.dataset.investmentType)});
+    document.getElementById('investmentAccountOptions')?.addEventListener('click',event=>{const button=event.target.closest('[data-investment-account]');if(!button)return;selectInvestmentAccount(button.dataset.investmentAccount);if(!editingInvestmentId)currentTotalInput.value=round(currentAccountTotal(accountById(button.dataset.investmentAccount)))});
     document.getElementById('closeInvestment').onclick=()=>dialog.close();
     document.getElementById('cancelInvestment').onclick=()=>dialog.close();
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
     form.addEventListener('submit',event=>{
       event.preventDefault();
       const existing=editingInvestmentId?data.investments.find(item=>item.id===editingInvestmentId):null;
-      const entry=normalizeInvestmentRecord({id:existing?.id||crypto.randomUUID(),accountId:accountInput.value,date:dateInput.value,amount:num(amountInput.value),contributionType:typeInput.value,description:descriptionInput.value.trim(),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:existing?new Date().toISOString():undefined});
+      const entry=normalizeInvestmentRecord({id:existing?.id||crypto.randomUUID(),accountId:accountInput.value,date:dateInput.value,amount:num(amountInput.value),currentTotal:num(currentTotalInput.value),contributionType:'Your contribution',description:descriptionInput.value.trim(),createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:existing?new Date().toISOString():undefined});
       if(!entry)return;
       if(existing)data.investments[data.investments.findIndex(item=>item.id===existing.id)]=entry;else data.investments.unshift(entry);
-      save();syncInvestmentRecord(entry);dialog.close();render();
+      const account=accountById(entry.accountId),latest=latestBalanceRecord(entry.accountId);if(account&&latest)account.currentTotal=num(latest.currentTotal);
+      save();syncInvestmentRecord(entry);syncSettings();dialog.close();render();
     });
     entriesHost.addEventListener('click',event=>{
       const edit=event.target.closest('[data-edit-investment]'),remove=event.target.closest('[data-delete-investment]');
       if(edit)openInvestment(edit.dataset.editInvestment);
-      if(remove){const entry=data.investments.find(item=>item.id===remove.dataset.deleteInvestment);if(!entry||!confirm('Delete this investment contribution?'))return;data.investments=data.investments.filter(item=>item.id!==entry.id);save();deleteCloudInvestment(entry.id);render()}
+      if(remove){const entry=data.investments.find(item=>item.id===remove.dataset.deleteInvestment);if(!entry||!confirm('Delete this investment contribution?'))return;data.investments=data.investments.filter(item=>item.id!==entry.id);const account=accountById(entry.accountId),latest=latestBalanceRecord(entry.accountId);if(account)account.currentTotal=num(latest?.currentTotal);save();deleteCloudInvestment(entry.id);syncSettings();render()}
     });
     settingsHost.addEventListener('change',event=>{
-      const input=event.target.closest('[data-investment-setting]');if(!input)return;const account=accountById(input.dataset.investmentAccountId);if(!account)return;account[input.dataset.investmentSetting]=input.dataset.investmentSetting==='annualGoal'?safeNumber(input.value,0):safeText(input.value||'Account',60);save();syncSettings();render();
+      const input=event.target.closest('[data-investment-setting]');if(!input)return;const account=accountById(input.dataset.investmentAccountId);if(!account)return;const field=input.dataset.investmentSetting;if(field==='name')account.name=safeText(input.value||'Account',60);else account[field]=safeNumber(input.value,0);if(field==='currentTotal'&&is401k(account)){const date=localToday(),existing=yourRecords().find(entry=>entry.accountId===account.id&&entry.date===date&&entry.amount===0&&entry.description==='Balance update'),entry=normalizeInvestmentRecord({id:existing?.id||crypto.randomUUID(),accountId:account.id,date,amount:0,currentTotal:account.currentTotal,contributionType:'Your contribution',description:'Balance update',createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:existing?new Date().toISOString():undefined});if(existing)data.investments[data.investments.findIndex(item=>item.id===existing.id)]=entry;else data.investments.unshift(entry);syncInvestmentRecord(entry)}save();syncSettings();render();
     });
     document.addEventListener('click',event=>{if(event.target.closest?.('.nav-tab'))requestAnimationFrame(syncHeaderAction)});
     const previousRender=render;
@@ -1643,4 +1687,108 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     const previousRenderCharts=renderCharts;
     renderCharts=()=>{previousRenderCharts();updateSavingsLatest()};
     render();
+  })();
+
+  (() => {
+    const highlightCurrentMonth = () => {
+      document.querySelectorAll('.monthly-table tr.current-month-row').forEach(row=>row.classList.remove('current-month-row'));
+      document.querySelector(`.monthly-table [data-month="${currentMonthKey()}"]`)?.closest('tr')?.classList.add('current-month-row');
+    };
+    const previousRender=render;
+    render=()=>{previousRender();highlightCurrentMonth();if(displayMode)applyDisplayMode()};
+    highlightCurrentMonth();
+  })();
+
+  (() => {
+    const section=document.getElementById('accounts');
+    const content=document.getElementById('accountsContent');
+    const dialog=document.getElementById('accountDialog');
+    const form=document.getElementById('accountForm');
+    const title=document.getElementById('accountDialogTitle');
+    const nameInput=document.getElementById('accountName');
+    const institutionInput=document.getElementById('accountInstitution');
+    const kindInput=document.getElementById('accountKind');
+    const useInput=document.getElementById('accountUse');
+    const bonusInput=document.getElementById('accountSignupBonus');
+    const statusInput=document.getElementById('accountStatus');
+    const imageInput=document.getElementById('accountImageFile');
+    const imagePreview=document.getElementById('accountImagePreview');
+    const imageStatus=document.getElementById('accountImageStatus');
+    const saveButton=document.getElementById('saveAccount');
+    const headerAction=document.getElementById('addExpense');
+    const defaultHeaderAction=headerAction?.onclick;
+    const cardIcon='<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M7 15h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    let editingAccountId='';
+    let draftSvg='';
+
+    const svgUrl=svg=>svg?`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`:'';
+    const artwork=(account,preview=false)=>account?.imageSvg?`<img src="${svgUrl(account.imageSvg)}" alt="${preview?'':'Artwork for '+escapeHtml(account.name)}">`:`<span class="account-placeholder">${cardIcon}</span>`;
+    const selectKind=kind=>{kindInput.value=kind;document.querySelectorAll('[data-account-kind]').forEach(button=>button.classList.toggle('selected',button.dataset.accountKind===kind))};
+    const renderPreview=()=>{imagePreview.innerHTML=artwork(draftSvg?{imageSvg:draftSvg,name:nameInput.value||'Account'}:null,true);document.getElementById('removeAccountImage').disabled=!draftSvg};
+    const openAccount=(id='')=>{
+      const account=id?data.accounts.find(item=>item.id===id):null;
+      editingAccountId=account?.id||'';
+      draftSvg=account?.imageSvg||'';
+      nameInput.value=account?.name||'';
+      institutionInput.value=account?.institution||'';
+      useInput.value=account?.use||'';
+      bonusInput.value=account?.signupBonus||'';
+      statusInput.value=account?.status||'Active';
+      selectKind(account?.kind||'Credit Card');
+      title.textContent=account?'Edit account':'Add account';
+      saveButton.textContent=account?'Save changes':'Add account';
+      imageStatus.textContent='SVG only · maximum 100 KB';
+      renderPreview();
+      dialog.showModal();
+      requestAnimationFrame(()=>nameInput.focus());
+    };
+    const cardMarkup=account=>`<article class="account-card"><div class="account-card-art">${artwork(account)}</div><div class="account-card-body"><div class="account-card-title"><div><h4>${escapeHtml(account.name)}</h4><span>${escapeHtml(account.institution||account.kind)}</span></div><span>${escapeHtml(account.status)}</span></div>${account.use?`<div class="account-card-copy"><small>Use</small><p>${escapeHtml(account.use)}</p></div>`:''}${account.signupBonus?`<div class="account-card-copy"><small>Signup bonus</small><p>${escapeHtml(account.signupBonus)}</p></div>`:''}<div class="account-card-actions"><button type="button" class="button ghost" data-edit-account="${account.id}">Edit</button><button type="button" class="button ghost" data-delete-account="${account.id}">Delete</button></div></div></article>`;
+    const groupMarkup=(kind,label)=>{
+      const matching=data.accounts.filter(account=>account.kind===kind).sort((a,b)=>a.name.localeCompare(b.name)),active=matching.filter(account=>account.status==='Active'),closed=matching.filter(account=>account.status==='Closed');
+      return `<section class="accounts-group"><div class="accounts-group-head"><h3>${label}</h3><span>${matching.length}</span></div>${active.length?`<div class="accounts-grid">${active.map(cardMarkup).join('')}</div>`:`<div class="accounts-empty">No active ${label.toLowerCase()} yet.</div>`}${closed.length?`<details class="accounts-closed"><summary>Closed · ${closed.length}</summary><div class="accounts-grid">${closed.map(cardMarkup).join('')}</div></details>`:''}</section>`;
+    };
+    const renderAccounts=()=>{if(content)content.innerHTML=groupMarkup('Credit Card','Credit Cards')+groupMarkup('Bank Account','Bank Accounts')};
+    const syncHeaderAction=()=>{
+      if(!headerAction)return;
+      const activeTab=document.querySelector('.nav-tab.active')?.dataset.tab;
+      if(activeTab==='accounts'){
+        headerAction.textContent='+ Add account';
+        headerAction.onclick=()=>openAccount();
+      }else if(headerAction.textContent==='+ Add account'){
+        headerAction.textContent='+ Add expense';
+        headerAction.onclick=defaultHeaderAction;
+      }
+    };
+
+    document.querySelector('.account-kind-options')?.addEventListener('click',event=>{const button=event.target.closest('[data-account-kind]');if(button)selectKind(button.dataset.accountKind)});
+    imageInput.addEventListener('change',async()=>{
+      const file=imageInput.files?.[0];imageInput.value='';if(!file)return;
+      if(!file.name.toLowerCase().endsWith('.svg')&&file.type!=='image/svg+xml'){imageStatus.textContent='Choose an SVG file.';return}
+      if(file.size>100000){imageStatus.textContent='That SVG is over the 100 KB limit.';return}
+      const cleaned=sanitizeAccountSvgMarkup(await file.text());
+      if(!cleaned){imageStatus.textContent='That SVG could not be safely imported.';return}
+      draftSvg=cleaned;imageStatus.textContent='SVG cleaned and ready to save.';renderPreview();
+    });
+    document.getElementById('removeAccountImage').onclick=()=>{draftSvg='';imageStatus.textContent='Image removed. Save to apply.';renderPreview()};
+    document.getElementById('closeAccount').onclick=()=>dialog.close();
+    document.getElementById('cancelAccount').onclick=()=>dialog.close();
+    dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});
+    form.addEventListener('submit',event=>{
+      event.preventDefault();
+      const existing=editingAccountId?data.accounts.find(item=>item.id===editingAccountId):null;
+      const account=normalizeAccountRecord({id:existing?.id||crypto.randomUUID(),kind:kindInput.value,name:nameInput.value,institution:institutionInput.value,use:useInput.value,signupBonus:bonusInput.value,status:statusInput.value,imageSvg:draftSvg,createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:existing?new Date().toISOString():undefined});
+      if(!account)return;
+      if(existing)data.accounts[data.accounts.findIndex(item=>item.id===existing.id)]=account;else data.accounts.push(account);
+      save();syncAccountRecord(account);dialog.close();render();
+    });
+    content?.addEventListener('click',event=>{
+      const edit=event.target.closest('[data-edit-account]'),remove=event.target.closest('[data-delete-account]');
+      if(edit){openAccount(edit.dataset.editAccount);return}
+      if(remove){const account=data.accounts.find(item=>item.id===remove.dataset.deleteAccount);if(!account||!confirm(`Delete ${account.name}?`))return;data.accounts=data.accounts.filter(item=>item.id!==account.id);save();deleteCloudAccount(account.id);render()}
+    });
+    document.addEventListener('click',event=>{if(event.target.closest?.('.nav-tab'))requestAnimationFrame(syncHeaderAction)});
+    document.addEventListener('change',event=>{if(event.target?.id!=='restoreBackupFile')return;event.stopImmediatePropagation();restoreBackup(event).then(()=>firebaseClient&&firebaseUser?Promise.all(data.accounts.map(syncAccountRecord)):null)},true);
+    const previousRender=render;
+    render=()=>{previousRender();renderAccounts();syncHeaderAction();if(displayMode)applyDisplayMode()};
+    renderAccounts();syncHeaderAction();if(displayMode)applyDisplayMode();
   })();
