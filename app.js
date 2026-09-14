@@ -211,7 +211,10 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       if (category === 'Shopping') subcategory = 'Dining';
       document.querySelectorAll('[data-category]').forEach(button => button.classList.toggle('selected', button === choice));
       document.querySelectorAll('[data-shopping]').forEach((button, index) => button.classList.toggle('selected', index === 0));
+      modifier.value = category === 'Restaurants' ? '0.97' : '0.95';
+      document.querySelectorAll('[data-new-modifier]').forEach(button => button.classList.toggle('selected', button.dataset.newModifier === modifier.value));
       updateType();
+      updateFinal();
     });
     document.getElementById('shoppingSuboptions').addEventListener('click', event => {
       const choice = event.target.closest('[data-shopping]');
@@ -627,7 +630,7 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     if (title) {
       const brand = document.createElement('div');
       brand.className = 'brand-mark';
-      brand.innerHTML = '<img src="app-icon-v6.png" width="40" height="40" alt="Estuary">';
+      brand.innerHTML = '<img src="app-icon-v8.png" width="40" height="40" alt="Estuary">';
       title.replaceWith(brand);
     }
     document.querySelector('#expenseEditCategoryOptions [data-edit-category="Bills"]')?.remove();
@@ -708,6 +711,51 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     const settingsRender = render;
     render = () => { settingsRender(); setupExpenseSettingsTabs(); };
     render();
+  })();
+
+  (() => {
+    const addButton=document.getElementById('saveExpense');
+    const originalAddExpense=addButton?.onclick;
+    let expenseFeedback=null;
+    let feedbackTimer=0;
+    const feedbackTargets = type => type==='Spending'?[0,2,3]:type==='Groceries'?[1,2,3]:[2,3];
+    const renderExpenseFeedback = () => {
+      document.querySelectorAll('.metric-expense-delta').forEach(node=>node.remove());
+      document.querySelectorAll('.metric-value-feedback').forEach(row=>{
+        const value=row.querySelector(':scope > strong');
+        if(value)row.replaceWith(value);
+      });
+      if(!expenseFeedback||Date.now()>=expenseFeedback.expires)return;
+      const cards=[...document.querySelectorAll('#metrics .metric')];
+      feedbackTargets(expenseFeedback.type).forEach(index=>{
+        const value=cards[index]?.querySelector('strong');
+        if(!value)return;
+        const row=document.createElement('div');
+        row.className='metric-value-feedback';
+        value.before(row);
+        row.append(value);
+        const delta=document.createElement('span');
+        const increases=index<2;
+        delta.className='metric-expense-delta';
+        delta.setAttribute('aria-hidden','true');
+        delta.textContent=`${increases?'↑':'↓'} ${money(expenseFeedback.amount)}`;
+        row.append(delta);
+      });
+    };
+    if(addButton&&originalAddExpense)addButton.onclick=event=>{
+      const original=num(document.getElementById('expenseAmount')?.value);
+      const modifier=Math.max(.9,Math.min(1,num(document.getElementById('expenseModifier')?.value)));
+      const amount=round(original*modifier);
+      const type=document.getElementById('expenseType')?.value;
+      originalAddExpense.call(addButton,event);
+      if(original<=0||!['Spending','Groceries','Water','Electricity','Gas'].includes(type))return;
+      expenseFeedback={amount,type,expires:Date.now()+2500};
+      window.clearTimeout(feedbackTimer);
+      renderExpenseFeedback();
+      feedbackTimer=window.setTimeout(()=>{expenseFeedback=null;renderExpenseFeedback()},2500);
+    };
+    const previousRender=render;
+    render=()=>{previousRender();renderExpenseFeedback();if(displayMode)applyDisplayMode()};
   })();
 
   (() => {
