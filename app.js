@@ -643,7 +643,7 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
     if (title) {
       const brand = document.createElement('div');
       brand.className = 'brand-mark';
-      brand.innerHTML = '<img src="app-icon-v8.png" width="40" height="40" alt="Estuary">';
+      brand.innerHTML = '<img src="app-icon.png?v=9" width="40" height="40" alt="Estuary">';
       title.replaceWith(brand);
     }
     document.querySelector('#expenseEditCategoryOptions [data-edit-category="Bills"]')?.remove();
