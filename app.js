@@ -785,19 +785,38 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
         financeNotesInput.maxLength = 5000;
         financeNotesInput.placeholder = 'General notes about your finances';
         financeNotesInput.value = data.settings.financeNotes || '';
-        let notesSyncTimer;
+        const resizeFinanceNotes = () => {
+          financeNotesInput.style.height = 'auto';
+          financeNotesInput.style.height = `${financeNotesInput.scrollHeight}px`;
+        };
+        financeNotesInput._resizeToContent = resizeFinanceNotes;
         financeNotesInput.addEventListener('input', () => {
+          resizeFinanceNotes();
+        });
+        window.addEventListener('resize',resizeFinanceNotes);
+        notesField.append(financeNotesInput);
+        const notesActions = document.createElement('div');
+        notesActions.className = 'finance-notes-actions';
+        const notesSaveButton = document.createElement('button');
+        notesSaveButton.type = 'button';
+        notesSaveButton.className = 'button primary';
+        notesSaveButton.textContent = 'Save Notes';
+        notesSaveButton.addEventListener('click', async () => {
           data.settings.financeNotes = safeText(financeNotesInput.value,5000);
           save();
-          window.clearTimeout(notesSyncTimer);
-          notesSyncTimer = window.setTimeout(syncSettings,600);
+          notesSaveButton.disabled = true;
+          notesSaveButton.textContent = 'Saving…';
+          await syncSettings();
+          notesSaveButton.textContent = 'Saved';
+          window.setTimeout(() => {
+            notesSaveButton.disabled = false;
+            notesSaveButton.textContent = 'Save Notes';
+          }, 1500);
         });
-        financeNotesInput.addEventListener('change', () => {
-          window.clearTimeout(notesSyncTimer);
-          syncSettings();
-        });
-        notesField.append(financeNotesInput);
+        notesActions.append(notesSaveButton);
+        notesField.append(notesActions);
         fixedInput.closest('label')?.before(notesField);
+        requestAnimationFrame(resizeFinanceNotes);
       }
       normalizeFixedItems();
       if (fixedItemsNeedSync && firebaseUser) { save(); syncSettings(); fixedItemsNeedSync = false; }
@@ -833,6 +852,7 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       kevinInput.value=round(data.settings.kevinMortgage);
       fixedInput.value=round(data.settings.fixedExpenses);
       if(document.activeElement!==financeNotesInput)financeNotesInput.value=data.settings.financeNotes||'';
+      requestAnimationFrame(()=>financeNotesInput._resizeToContent?.());
       const secondPanel=host.querySelector('[data-expense-settings-panel="two"]');
       secondPanel.innerHTML=`<p class="small">These values add up to Fixed monthly expenses.</p><div class="fixed-expense-items">${data.settings.fixedExpenseItems.map(item=>`<div class="fixed-expense-row"><input type="text" aria-label="Expense name" data-fixed-expense-field="label" data-fixed-expense-id="${item.id}" value="${escapeHtml(item.label)}"><input type="number" inputmode="decimal" aria-label="Expense amount" data-fixed-expense-field="amount" data-fixed-expense-id="${item.id}" value="${round(item.amount)}"><button type="button" class="fixed-expense-remove" data-remove-fixed-expense="${item.id}" aria-label="Remove ${escapeHtml(item.label)}" ${data.settings.fixedExpenseItems.length===1?'disabled':''}>×</button></div>`).join('')}</div><div class="fixed-expense-actions"><button type="button" class="button ghost" data-add-fixed-expense>+ Add expense</button></div>`;
     };
