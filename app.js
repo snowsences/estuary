@@ -17,7 +17,7 @@ function normalizeSettings(value){
   const meganMortgage=safeNumber(source.meganR1??starter.settings.meganR1);
   const legacyKevinMortgage=safeNumber(source.kevinMortgage??starter.settings.kevinMortgage,0);
   const mortgagePayment=safeNumber(source.mortgagePayment??round(legacyKevinMortgage+meganMortgage),0);
-  const settings={monthlyIncome:safeNumber(source.monthlyIncome??starter.settings.monthlyIncome,0),fixedExpenses:safeNumber(source.fixedExpenses??starter.settings.fixedExpenses,0),mortgagePayment,kevinMortgage:round(mortgagePayment-meganMortgage),foodShare:safeNumber(source.foodShare??starter.settings.foodShare,0,100),meganR1:meganMortgage,meganR2:safeNumber(source.meganR2??starter.settings.meganR2),financeNotes:safeText(source.financeNotes,5000)};
+  const settings={monthlyIncome:safeNumber(source.monthlyIncome??starter.settings.monthlyIncome,0),fixedExpenses:safeNumber(source.fixedExpenses??starter.settings.fixedExpenses,0),mortgagePayment,kevinMortgage:round(mortgagePayment-meganMortgage),foodShare:safeNumber(source.foodShare??starter.settings.foodShare,0,100),meganR1:meganMortgage,meganR2:safeNumber(source.meganR2??starter.settings.meganR2),financeNotes:safeText(source.financeNotes,5000),financeNotes2:safeText(source.financeNotes2,5000),financeNotes3:safeText(source.financeNotes3,5000),financeNotes4:safeText(source.financeNotes4,5000)};
   if(Array.isArray(source.fixedExpenseItems))settings.fixedExpenseItems=source.fixedExpenseItems.slice(0,100).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)).map(item=>({id:safeId(item.id,'fixed'),label:safeText(item.label||'Expense',80),amount:safeNumber(item.amount)}));
   if(Array.isArray(source.incomeLevels))settings.incomeLevels=source.incomeLevels.slice(0,100).filter(item=>item&&typeof item==='object'&&!Array.isArray(item)&&safeMonthId(item.start)).map(item=>({id:safeId(item.id,'income'),start:safeMonthId(item.start),end:safeMonthId(item.end),paycheck:safeNumber(item.paycheck,0)}));
   const accountSource=Array.isArray(source.investmentAccounts)&&source.investmentAccounts.length?source.investmentAccounts.slice(0,100):defaultInvestmentAccounts;
@@ -775,26 +775,32 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
         mortgageField.append(mortgageInput);
         fixedInput.closest('label')?.before(mortgageField);
       }
-      let financeNotesInput = document.querySelector('[data-finance-notes]');
-      if (!financeNotesInput) {
+      const financeNotesKeys = ['financeNotes','financeNotes2','financeNotes3','financeNotes4'];
+      let financeNotesInputs = [...document.querySelectorAll('[data-finance-notes]')];
+      if (!financeNotesInputs.length) {
         const notesField = document.createElement('label');
         notesField.className = 'finance-notes-field';
         notesField.append('Notes');
-        financeNotesInput = document.createElement('textarea');
-        financeNotesInput.dataset.financeNotes = 'true';
-        financeNotesInput.maxLength = 5000;
-        financeNotesInput.placeholder = 'General notes about your finances';
-        financeNotesInput.value = data.settings.financeNotes || '';
-        const resizeFinanceNotes = () => {
-          financeNotesInput.style.height = 'auto';
-          financeNotesInput.style.height = `${financeNotesInput.scrollHeight}px`;
-        };
-        financeNotesInput._resizeToContent = resizeFinanceNotes;
-        financeNotesInput.addEventListener('input', () => {
-          resizeFinanceNotes();
+        const notesGrid = document.createElement('div');
+        notesGrid.className = 'finance-notes-grid';
+        financeNotesInputs = financeNotesKeys.map((key,index) => {
+          const input = document.createElement('textarea');
+          input.dataset.financeNotes = String(index);
+          input.maxLength = 5000;
+          input.placeholder = `Note ${index+1}`;
+          input.setAttribute('aria-label',`Finance note ${index+1}`);
+          input.value = data.settings[key] || '';
+          const resizeToContent = () => {
+            input.style.height = 'auto';
+            input.style.height = `${input.scrollHeight}px`;
+          };
+          input._resizeToContent = resizeToContent;
+          input.addEventListener('input', resizeToContent);
+          window.addEventListener('resize',resizeToContent);
+          notesGrid.append(input);
+          return input;
         });
-        window.addEventListener('resize',resizeFinanceNotes);
-        notesField.append(financeNotesInput);
+        notesField.append(notesGrid);
         const notesActions = document.createElement('div');
         notesActions.className = 'finance-notes-actions';
         const notesSaveButton = document.createElement('button');
@@ -802,7 +808,7 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
         notesSaveButton.className = 'button primary';
         notesSaveButton.textContent = 'Save Notes';
         notesSaveButton.addEventListener('click', async () => {
-          data.settings.financeNotes = safeText(financeNotesInput.value,5000);
+          financeNotesKeys.forEach((key,index) => { data.settings[key] = safeText(financeNotesInputs[index].value,5000); });
           save();
           notesSaveButton.disabled = true;
           notesSaveButton.textContent = 'Saving…';
@@ -816,14 +822,14 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
         notesActions.append(notesSaveButton);
         notesField.append(notesActions);
         fixedInput.closest('label')?.before(notesField);
-        requestAnimationFrame(resizeFinanceNotes);
+        requestAnimationFrame(()=>financeNotesInputs.forEach(input=>input._resizeToContent?.()));
       }
       normalizeFixedItems();
       if (fixedItemsNeedSync && firebaseUser) { save(); syncSettings(); fixedItemsNeedSync = false; }
       let host = document.getElementById('expenseSettingsTabs');
       if (!host) {
         const fields = ['mortgagePayment','meganR1','meganR2','kevinMortgage','fixedExpenses','foodShare'].map(key => document.querySelector(`[data-setting="${key}"]`)?.closest('label')).filter(Boolean);
-        fields.push(financeNotesInput.closest('label'));
+        fields.push(financeNotesInputs[0].closest('label'));
         host = document.createElement('section');
         host.id = 'expenseSettingsTabs';
         host.className = 'expense-settings-tabs';
@@ -851,8 +857,8 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       const kevinInput=document.querySelector('[data-setting="kevinMortgage"]');
       kevinInput.value=round(data.settings.kevinMortgage);
       fixedInput.value=round(data.settings.fixedExpenses);
-      if(document.activeElement!==financeNotesInput)financeNotesInput.value=data.settings.financeNotes||'';
-      requestAnimationFrame(()=>financeNotesInput._resizeToContent?.());
+      financeNotesInputs.forEach((input,index)=>{if(document.activeElement!==input)input.value=data.settings[financeNotesKeys[index]]||'';});
+      requestAnimationFrame(()=>financeNotesInputs.forEach(input=>input._resizeToContent?.()));
       const secondPanel=host.querySelector('[data-expense-settings-panel="two"]');
       secondPanel.innerHTML=`<p class="small">These values add up to Fixed monthly expenses.</p><div class="fixed-expense-items">${data.settings.fixedExpenseItems.map(item=>`<div class="fixed-expense-row"><input type="text" aria-label="Expense name" data-fixed-expense-field="label" data-fixed-expense-id="${item.id}" value="${escapeHtml(item.label)}"><input type="number" inputmode="decimal" aria-label="Expense amount" data-fixed-expense-field="amount" data-fixed-expense-id="${item.id}" value="${round(item.amount)}"><button type="button" class="fixed-expense-remove" data-remove-fixed-expense="${item.id}" aria-label="Remove ${escapeHtml(item.label)}" ${data.settings.fixedExpenseItems.length===1?'disabled':''}>×</button></div>`).join('')}</div><div class="fixed-expense-actions"><button type="button" class="button ghost" data-add-fixed-expense>+ Add expense</button></div>`;
     };
