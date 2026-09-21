@@ -1610,6 +1610,7 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       '2025': { total:18000, months:12 },
       '2026': { total:15700, months:9 }
     };
+    window.estuaryTravelHistory = historicTravel;
 
     const historicalTravelForMonth = monthId => {
       const history = historicTravel[monthId.slice(0,4)];
@@ -1709,6 +1710,38 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       if (!latest) { insightHost.classList.add('hidden'); return; }
       const messages = [];
       const latestMonthName = monthLabels[Number(latest.id.slice(5,7))-1];
+      const [latestYear,latestMonthNumber]=latest.id.split('-').map(Number);
+      const priorDate=new Date(latestYear,latestMonthNumber-2,1);
+      const priorId=`${priorDate.getFullYear()}-${String(priorDate.getMonth()+1).padStart(2,'0')}`;
+      const previous=data.months.find(month=>month.id===priorId);
+      const shortMonth=month=>monthLabels[Number(month.id.slice(5,7))-1].slice(0,3);
+      const addMonthlyChange=(label,currentValue,previousValue,{up='rose',down='fell'}={})=>{
+        const difference=round(num(currentValue)-num(previousValue));
+        if(Math.abs(difference)<1)return;
+        messages.push(`${label} <b>${difference>0?up:down} ${money(Math.abs(difference))}</b> from ${shortMonth(previous)} to ${shortMonth(latest)}.`);
+      };
+      if(previous){
+        addMonthlyChange('Spending',latest.spending,previous.spending);
+        if(num(latest.groceries)||num(previous.groceries))addMonthlyChange('Groceries',latest.groceries,previous.groceries);
+        const latestUtilities=num(latest.water)+num(latest.electricity)+num(latest.gas);
+        const previousUtilities=num(previous.water)+num(previous.electricity)+num(previous.gas);
+        if(latestUtilities||previousUtilities)addMonthlyChange('Your combined utility bills',latestUtilities,previousUtilities);
+        addMonthlyChange('Savings',total(latest).saved,total(previous).saved,{up:'improved by',down:'fell by'});
+        const latestIncome=num(total(latest).income),previousIncome=num(total(previous).income);
+        if(latestIncome>0&&previousIncome>0){
+          const latestRate=round(total(latest).saved/latestIncome*100),previousRate=round(total(previous).saved/previousIncome*100),rateDifference=round(latestRate-previousRate);
+          if(Math.abs(rateDifference)>=1)messages.push(`Your savings rate was <b>${latestRate}%</b> in ${shortMonth(latest)}, <b>${Math.abs(rateDifference)} points ${rateDifference>0?'higher':'lower'}</b> than ${shortMonth(previous)}.`);
+        }
+        const entryTotal=(monthId,predicate)=>round(data.entries.filter(entry=>entry.month===monthId&&entry.type==='Spending'&&predicate(entry)).reduce((sum,entry)=>sum+num(entry.final),0));
+        const latestDining=entryTotal(latest.id,entry=>entry.category==='Dining'),previousDining=entryTotal(previous.id,entry=>entry.category==='Dining');
+        if(latestDining||previousDining)addMonthlyChange('Dining',latestDining,previousDining);
+        const extraIncomeFor=monthId=>round(data.extraIncome.filter(entry=>entry.month===monthId).reduce((sum,entry)=>sum+num(entry.amount),0));
+        const latestExtra=extraIncomeFor(latest.id),previousExtra=extraIncomeFor(previous.id);
+        if(latestExtra||previousExtra){
+          const extraDifference=round(latestExtra-previousExtra);
+          if(Math.abs(extraDifference)>=1)messages.push(`Extra Income was <b>${money(latestExtra)}</b> in ${shortMonth(latest)}, <b>${money(Math.abs(extraDifference))} ${extraDifference>0?'more':'less'}</b> than ${shortMonth(previous)}.`);
+        }
+      }
       const previousThree = completed.slice(-4,-1);
       if (previousThree.length === 3) {
         const average = previousThree.reduce((sum,month)=>sum+num(month.spending),0)/3;
@@ -1731,6 +1764,15 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       const savedDifference=round(savedToDate-savedLastYear);
       if (savedDifference) messages.push(`You've saved <b>${money(Math.abs(savedDifference))}</b> ${savedDifference>0?'more':'less'} than this point last year.`);
       if (savedToDate) messages.push(`You've saved <b>${money(savedToDate)}</b> so far in ${year}.`);
+      const travelHistory=window.estuaryTravelHistory?.[String(year)],monthsThroughCutoff=Number(cutoff);
+      const travelToDate=travelHistory
+        ? round(travelHistory.total*Math.min(monthsThroughCutoff,travelHistory.months)/travelHistory.months)
+        : round(data.entries.filter(entry=>entry.month.startsWith(`${year}-`)&&entry.month.slice(5)<=cutoff&&entry.type==='Spending'&&entry.subcategory==='Travel').reduce((sum,entry)=>sum+num(entry.final),0));
+      const spendingToDate=round(thisYear.reduce((sum,month)=>sum+num(month.spending),0));
+      if(travelToDate>0&&spendingToDate>0){
+        const travelShare=Math.round(travelToDate/spendingToDate*100);
+        messages.push(`Travel represents <b>${travelShare}%</b> of Spending so far in ${year}.`);
+      }
       if (thisYear.length) {
         const best=[...thisYear].sort((a,b)=>total(b).saved-total(a).saved)[0];
         messages.push(`<b>${monthLabels[Number(best.id.slice(5,7))-1]}</b> is your strongest savings month this year at <b>${money(total(best).saved)}</b>.`);
@@ -1743,6 +1785,23 @@ const backupReminderRender=render;render=()=>{backupReminderRender();setupBackup
       let streak=0;
       for (let index=completed.length-1; index>=0 && total(completed[index]).saved>0; index--) streak++;
       if (streak>=2) messages.push(`You've saved money for <b>${streak} completed months</b> in a row.`);
+      const activeAccountIds=new Set((data.settings.investmentAccounts||[]).filter(account=>!account.archived).map(account=>account.id));
+      const balanceSnapshots=new Map();
+      data.investmentBalances.forEach(entry=>{
+        if(!activeAccountIds.has(entry.accountId))return;
+        if(!balanceSnapshots.has(entry.date))balanceSnapshots.set(entry.date,{total:0,accounts:new Set()});
+        const snapshot=balanceSnapshots.get(entry.date);
+        snapshot.total+=num(entry.total);
+        snapshot.accounts.add(entry.accountId);
+      });
+      const completeSnapshots=[...balanceSnapshots.entries()].filter(([,snapshot])=>activeAccountIds.size&&snapshot.accounts.size===activeAccountIds.size).sort(([a],[b])=>a.localeCompare(b));
+      if(completeSnapshots.length>=2){
+        const [previousDate,previousSnapshot]=completeSnapshots.at(-2),[latestDate,latestSnapshot]=completeSnapshots.at(-1),difference=round(latestSnapshot.total-previousSnapshot.total);
+        if(Math.abs(difference)>=1){
+          const since=new Date(`${previousDate}T12:00:00`).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+          messages.push(`Your portfolio is <b>${money(Math.abs(difference))} ${difference>0?'higher':'lower'}</b> than its ${since} update.`);
+        }
+      }
       const signature=messages.join('\n');
       if (signature!==insightSignature) {
         insightSignature=signature;
