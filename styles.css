@@ -4893,3 +4893,27 @@ dialog .dialog-inner,
     }
   }
 }
+
+/* Mobile overview timeframe controls */
+@media (max-width: 680px) {
+  #overview .chart-controls > h2 {
+    display: none !important;
+  }
+  #overview .chart-controls {
+    display: block !important;
+    width: 100%;
+  }
+  #overview .chart-controls .chart-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  #overview .chart-controls .chart-tabs button {
+    width: 100%;
+    min-width: 0;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    white-space: nowrap;
+  }
+}
