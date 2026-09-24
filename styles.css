@@ -4586,3 +4586,76 @@ body:not(.auth-locked) #authGate {
   margin-top: 6px;
   font-size: 14px;
 }
+
+/* Phones: the header's add button becomes a Material 3 floating action button,
+   16px from the right edge and 16px above the 70px bottom navigation. Its text stays as the
+   accessible label ("Add expense", "Add investment", …) but is visually replaced by a + icon. */
+@media (max-width: 680px) {
+  .header-actions {
+    position: fixed;
+    z-index: 21;
+    left: auto;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(70px + 16px);
+    display: block !important;
+    width: auto;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: none;
+    border: 0;
+  }
+  .header-actions #addExpense {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    padding: 0 !important;
+    border: 0;
+    border-radius: 16px;
+    --fab-icon: #10272b;
+    font-size: 0 !important;
+    color: transparent !important;
+    overflow: hidden;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.3),
+      0 4px 8px 3px rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.15s ease;
+  }
+  /* 24px plus icon drawn with two bars, in the button's label colour */
+  .header-actions #addExpense::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 24px;
+    height: 24px;
+    background:
+      linear-gradient(var(--fab-icon), var(--fab-icon)) center / 16px 2px no-repeat,
+      linear-gradient(var(--fab-icon), var(--fab-icon)) center / 2px 16px no-repeat;
+  }
+  /* Material state layer for hover, focus and press */
+  .header-actions #addExpense::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--fab-icon);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .header-actions #addExpense:hover::after {
+    opacity: 0.08;
+  }
+  .header-actions #addExpense:focus-visible::after,
+  .header-actions #addExpense:active::after {
+    opacity: 0.12;
+  }
+  .header-actions #addExpense:hover,
+  .header-actions #addExpense:focus-visible {
+    box-shadow:
+      0 2px 3px rgba(0, 0, 0, 0.3),
+      0 6px 10px 4px rgba(0, 0, 0, 0.15);
+  }
+}
