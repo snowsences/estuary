@@ -38,6 +38,7 @@ let displayMode = localStorage.getItem(localKeys.displayMode) === 'on',
   historyKind = '',
   historyMonth = '',
   historyMonthsShown = 3,
+  historyRevealFrom = null,
   money = n => {
     const value = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -500,6 +501,50 @@ let active = data.months.find(month => month.id.startsWith(String(currentYear)))
   selectedYear = String(currentYear);
 const save = () => localStorage.setItem(key, JSON.stringify(data));
 
+// Motion is skipped entirely when the device asks for reduced motion.
+const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Replays a section's entrance animations (charts drawing in, bars filling) for a moment.
+function playEntrance(section) {
+  if (!section || !motionOK()) return;
+  section.classList.remove('animate-in');
+  void section.offsetWidth;
+  section.classList.add('animate-in');
+  clearTimeout(section.entranceTimer);
+  section.entranceTimer = setTimeout(() => section.classList.remove('animate-in'), 1200);
+}
+// Remembers each row's contents so a redraw can briefly highlight rows that were just added or edited.
+const changeTracker = { seen: new Map(), changedAt: new Map(), primed: new Set() };
+function trackChanges(scope, items, key, signature) {
+  const primed = changeTracker.primed.has(scope);
+  items.forEach(item => {
+    const id = `${scope}:${key(item)}`,
+      next = signature(item);
+    if (primed && changeTracker.seen.get(id) !== next) changeTracker.changedAt.set(id, performance.now());
+    changeTracker.seen.set(id, next);
+  });
+  changeTracker.primed.add(scope);
+}
+// Attributes for a recently changed row; the negative delay lets a redraw continue the highlight.
+function changeHighlight(scope, id) {
+  const at = changeTracker.changedAt.get(`${scope}:${id}`),
+    age = at === undefined ? Infinity : performance.now() - at;
+  return age < 1500 && motionOK() ? ` data-changed style="--changed-delay:${-Math.round(age)}ms"` : '';
+}
+// Collapses a list row, then redraws; the data has already changed, so a redraw mid-way is harmless.
+function collapseThenRender(row) {
+  if (!row || !motionOK() || !row.animate) return render();
+  const height = row.getBoundingClientRect().height;
+  row
+    .animate(
+      [
+        { height: `${height}px`, opacity: 1 },
+        { height: '0px', opacity: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0, borderWidth: 0 },
+      ],
+      { duration: 200, easing: 'cubic-bezier(0.3, 0, 0.8, 0.15)' },
+    )
+    .finished.then(render, render);
+}
+
 // Emphasise a figure in prose as good (green) or bad (warm) news; plain <b> stays neutral.
 const tone = (html, good) => `<b class="${good ? 'good' : 'bad'}">${html}</b>`;
 
@@ -560,15 +605,6 @@ function renderCore() {
     configInput.value =
       localStorage.getItem(localKeys.firebaseConfig) || JSON.stringify(builtInFirebaseConfig, null, 2);
 }
-document.querySelectorAll('.tab').forEach(
-  b =>
-    (b.onclick = () => {
-      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-      document.querySelectorAll('.app > section').forEach(x => x.classList.add('hidden'));
-      b.classList.add('active');
-      document.getElementById(b.dataset.tab).classList.remove('hidden');
-    }),
-);
 monthPicker.onchange = e => {
   active = e.target.value;
   render();
@@ -1232,6 +1268,10 @@ const applyTheme = theme => {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(localKeys.theme, theme);
   document.getElementById('themeToggle').textContent = theme === 'dark' ? 'Light mode' : 'Dark mode';
+  // Match the phone's status bar to the app background.
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--bg').trim());
 };
 document.getElementById('themeToggle').onclick = () =>
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
@@ -1537,11 +1577,17 @@ function savedTone(value) {
         : 'saved-negative';
 }
 function monthTable(months) {
+  trackChanges(
+    'cell',
+    data.months.flatMap(month => ['water', 'electricity', 'gas'].map(key => [month, key])),
+    ([month, key]) => `${month.id}-${key}`,
+    ([month, key]) => round(month[key]),
+  );
   return `<div class="table-wrap"><table class="table monthly-table"><thead><tr><th>Month</th><th>Saved</th><th>Spending</th><th>Food</th><th>Water</th><th>Electricity</th><th>Gas</th><th>Megan owes</th><th aria-label="Actions"></th></tr></thead><tbody>${months
     .map(month => {
       const values = total(month),
         label = `${monthLabels[Number(month.id.slice(5, 7)) - 1].slice(0, 3)} '${month.id.slice(2, 4)}`;
-      return `<tr data-month="${month.id}"><th>${label}</th><td class="saved ${savedTone(values.saved)} ${values.savedLocked ? 'saved-locked' : ''}" ${values.savedLocked ? `title="Saved was locked on ${new Date(month.savedLockedAt).toLocaleDateString()}"` : ''}>${money(values.saved)}</td><td><div class="spending-cell"><span class="month-value">${money(month.spending)}</span><button class="notes-button ${month.notes ? 'has-notes' : ''}" data-notes-month="${month.id}" aria-label="Edit notes for ${month.label}" title="${month.notes ? 'Edit notes' : 'Add notes'}">▤</button></div></td><td class="month-value">${money(month.groceries)}</td>${['water', 'electricity', 'gas'].map(key => `<td class="${utilityValueMissing(month, key) ? 'utility-missing' : ''}"><input class="utility-input" type="number" inputmode="decimal" min="0" step="0.01" data-month="${month.id}" data-key="${key}" value="${round(month[key]).toFixed(2)}" aria-label="${key[0].toUpperCase() + key.slice(1)} for ${month.label}"></td>`).join('')}<td class="megan">${money(values.megan)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${month.id}">Add cash offset</button></div></details></td></tr>`;
+      return `<tr data-month="${month.id}"><th>${label}</th><td class="saved ${savedTone(values.saved)} ${values.savedLocked ? 'saved-locked' : ''}" ${values.savedLocked ? `title="Saved was locked on ${new Date(month.savedLockedAt).toLocaleDateString()}"` : ''}>${money(values.saved)}</td><td><div class="spending-cell"><span class="month-value">${money(month.spending)}</span><button class="notes-button ${month.notes ? 'has-notes' : ''}" data-notes-month="${month.id}" aria-label="Edit notes for ${month.label}" title="${month.notes ? 'Edit notes' : 'Add notes'}">▤</button></div></td><td class="month-value">${money(month.groceries)}</td>${['water', 'electricity', 'gas'].map(key => `<td class="${utilityValueMissing(month, key) ? 'utility-missing' : ''}"${changeHighlight('cell', `${month.id}-${key}`)}><input class="utility-input" type="number" inputmode="decimal" min="0" step="0.01" data-month="${month.id}" data-key="${key}" value="${round(month[key]).toFixed(2)}" aria-label="${key[0].toUpperCase() + key.slice(1)} for ${month.label}"></td>`).join('')}<td class="megan">${money(values.megan)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${month.id}">Add cash offset</button></div></details></td></tr>`;
     })
     .join('')}</tbody></table></div>`;
 }
@@ -1568,16 +1614,6 @@ document.addEventListener('pointermove', event => {
   else hideChartTooltip();
 });
 document.addEventListener('pointerleave', hideChartTooltip);
-document.querySelectorAll('.tab').forEach(
-  button =>
-    (button.onclick = () => {
-      document.querySelectorAll('.tab').forEach(item => item.classList.remove('active'));
-      document.querySelectorAll('.app > section').forEach(item => item.classList.add('hidden'));
-      button.classList.add('active');
-      document.getElementById(button.dataset.tab).classList.remove('hidden');
-      if (button.dataset.tab === 'overview') renderCharts();
-    }),
-);
 function renderMonthlyTimeline() {
   const timeline = document.getElementById('yearTimeline'),
     today = new Date(),
@@ -1829,20 +1865,96 @@ afterRender(() => {
   if (displayMode) applyDisplayMode();
 });
 render();
-document.querySelectorAll('.tab').forEach(
-  button =>
-    (button.onclick = () => {
-      document.querySelectorAll('.tab').forEach(item => item.classList.remove('active'));
-      document.querySelectorAll('.app > section').forEach(section => section.classList.add('hidden'));
-      button.classList.add('active');
-      document.getElementById(button.dataset.tab).classList.remove('hidden');
-      if (button.dataset.tab === 'overview') {
-        renderCharts();
-        updateSavingsMetricLabels();
-        requestAnimationFrame(updateChartControlsSticky);
-      }
-    }),
-);
+// Tabs. Each tab change is a history entry, so Android's Back returns to the previous tab.
+const tabOrder = [...document.querySelectorAll('.nav-tab')].map(tab => tab.dataset.tab);
+let restoringTab = false;
+function activateTab(name) {
+  document
+    .querySelectorAll('.tab')
+    .forEach(item => item.classList.toggle('active', item.dataset.tab === name));
+  document
+    .querySelectorAll('.app > section')
+    .forEach(section => section.classList.toggle('hidden', section.id !== name));
+  if (name === 'overview') {
+    renderCharts();
+    updateSavingsMetricLabels();
+    requestAnimationFrame(updateChartControlsSticky);
+  }
+  playEntrance(document.getElementById(name));
+}
+// The active tab's indicator is a ::before or ::after bar, depending on the layout.
+function navIndicator(tab) {
+  for (const pseudo of ['::before', '::after']) {
+    const style = getComputedStyle(tab, pseudo);
+    if (style.content !== 'none' && style.position === 'absolute' && parseFloat(style.width) > 0)
+      return { pseudo, width: parseFloat(style.width) };
+  }
+  return null;
+}
+function showTab(name) {
+  const from = document.querySelector('.nav-tab.active'),
+    to = document.querySelector(`.nav-tab[data-tab="${name}"]`);
+  if (!to || from === to) return Promise.resolve();
+  if (!restoringTab) history.pushState({ tab: name }, '', `#${name}`);
+  const fromRect = from?.getBoundingClientRect(),
+    fromIndicator = from && navIndicator(from);
+  // The nav updates at once (listeners elsewhere read the active tab); the page content animates.
+  document.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item === to));
+  const update = () => activateTab(name);
+  let done = Promise.resolve();
+  if (document.startViewTransition && motionOK()) {
+    document.documentElement.dataset.tabDirection =
+      tabOrder.indexOf(name) >= tabOrder.indexOf(from?.dataset.tab) ? 'forward' : 'back';
+    done = document.startViewTransition(update).updateCallbackDone;
+  } else update();
+  // Slide the indicator from the old tab to the new one.
+  const toIndicator = navIndicator(to);
+  if (fromRect && fromIndicator && toIndicator && motionOK() && to.animate) {
+    const toRect = to.getBoundingClientRect(),
+      dx = fromRect.left + fromRect.width / 2 - (toRect.left + toRect.width / 2);
+    to.animate(
+      [
+        { transform: `translateX(${dx}px) scaleX(${fromIndicator.width / toIndicator.width})` },
+        { transform: 'none' },
+      ],
+      { duration: 300, easing: 'cubic-bezier(0.2, 0, 0, 1)', pseudoElement: toIndicator.pseudo },
+    );
+  }
+  return done;
+}
+document.querySelectorAll('.tab').forEach(button => (button.onclick = () => showTab(button.dataset.tab)));
+window.addEventListener('popstate', event => {
+  const button = document.querySelector(`.nav-tab[data-tab="${event.state?.tab || 'overview'}"]`);
+  if (!button || button.classList.contains('active')) return;
+  // A click keeps the tab-change listeners elsewhere in sync without adding a new history entry.
+  restoringTab = true;
+  button.click();
+  restoringTab = false;
+});
+// Home-screen shortcuts open the app with ?action=…; it runs once the budget is unlocked.
+let launchActionPending = new URLSearchParams(location.search).get('action');
+{
+  const url = new URL(location.href);
+  url.searchParams.delete('action');
+  url.hash = '';
+  history.replaceState({ tab: 'overview' }, '', url);
+}
+async function runLaunchAction() {
+  const action = launchActionPending;
+  launchActionPending = null;
+  if (action === 'add-expense') {
+    await showTab('overview');
+    document.getElementById('addExpense')?.click();
+  } else if (action === 'bills') {
+    await showTab('months');
+    const cell =
+      document.querySelector('.monthly-table td.utility-missing input.utility-input') ||
+      document.querySelector(`.monthly-table input.utility-input[data-month="${currentMonthKey()}"]`);
+    cell?.scrollIntoView({ block: 'center' });
+    cell?.focus();
+    cell?.select?.();
+  }
+}
 function updateChartControlsSticky() {
   const controls = document.querySelector('#overview .chart-controls');
   if (!controls) return;
@@ -1894,8 +2006,10 @@ function setupHistoryFilter() {
   history.insertBefore(bar, entries);
   entries.addEventListener('click', event => {
     if (!event.target.closest('[data-history-more]')) return;
+    historyRevealFrom = historyMonthsShown;
     historyMonthsShown += 3;
     renderHistory();
+    historyRevealFrom = null;
   });
 }
 // Renders `items` (each with a `month`) as month groups; `row` renders one item, `amount` gives its value.
@@ -1909,11 +2023,11 @@ function historyGroupsHtml(items, row, amount, emptyText, showAll = false) {
   const monthIds = [...groups.keys()].sort((a, b) => b.localeCompare(a));
   const shown = showAll ? monthIds : monthIds.slice(0, historyMonthsShown);
   const html = shown
-    .map(monthId => {
+    .map((monthId, index) => {
       const monthItems = groups.get(monthId);
       const label = data.months.find(month => month.id === monthId)?.label || monthId;
       const sum = monthItems.reduce((total, item) => total + num(amount(item)), 0);
-      return `<section class="history-group"><header class="history-group-head"><h3>${label}</h3><span>${monthItems.length} ${monthItems.length === 1 ? 'entry' : 'entries'} · <b>${money(sum)}</b></span></header>${monthItems.map(row).join('')}</section>`;
+      return `<section class="history-group${historyRevealFrom !== null && index >= historyRevealFrom ? ' history-group-enter' : ''}"><header class="history-group-head"><h3>${label}</h3><span>${monthItems.length} ${monthItems.length === 1 ? 'entry' : 'entries'} · <b>${money(sum)}</b></span></header>${monthItems.map(row).join('')}</section>`;
     })
     .join('');
   const hidden = monthIds.length - shown.length;
@@ -1941,6 +2055,13 @@ function renderHistory() {
         (!historyMonth || entry.month === historyMonth),
     )
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  trackChanges(
+    'expense',
+    data.entries,
+    entry => entry.id,
+    entry =>
+      [entry.final, entry.month, entry.type, entry.category, entry.subcategory, entry.comment].join('|'),
+  );
   historyCount.textContent = `${sorted.length} expense${sorted.length === 1 ? '' : 's'}`;
   const editIcon =
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg>',
@@ -1949,7 +2070,7 @@ function renderHistory() {
   const row = entry => {
     const created = new Date(entry.createdAt),
       date = created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `<article class="history-row"><div class="history-row-main"><b>${expenseLabel(entry)}</b>${entry.comment ? `<p class="history-row-comment">${escapeHtml(entry.comment)}</p>` : ''}<time datetime="${created.toISOString()}">Entered ${date}</time></div><b class="history-row-amount">${money(entry.final)}</b><div class="history-actions"><button type="button" class="history-icon-button" data-edit-expense="${entry.id}" aria-label="Edit expense">${editIcon}</button><button type="button" class="history-icon-button history-delete" data-delete-expense="${entry.id}" aria-label="Delete expense">${deleteIcon}</button></div></article>`;
+    return `<article class="history-row"${changeHighlight('expense', entry.id)}><div class="history-row-main"><b>${expenseLabel(entry)}</b>${entry.comment ? `<p class="history-row-comment">${escapeHtml(entry.comment)}</p>` : ''}<time datetime="${created.toISOString()}">Entered ${date}</time></div><b class="history-row-amount">${money(entry.final)}</b><div class="history-actions"><button type="button" class="history-icon-button" data-edit-expense="${entry.id}" aria-label="Edit expense">${editIcon}</button><button type="button" class="history-icon-button history-delete" data-delete-expense="${entry.id}" aria-label="Delete expense">${deleteIcon}</button></div></article>`;
   };
   historyEntries.innerHTML = historyGroupsHtml(
     sorted,
@@ -2019,7 +2140,7 @@ document.addEventListener('click', event => {
     save();
     if (month) syncMonth(month);
     deleteCloudExpense(entry.id);
-    render();
+    collapseThenRender(remove.closest('.history-row'));
   }
 });
 document.getElementById('closeExpenseEdit').onclick = () => expenseEditDialog.close();
@@ -2139,12 +2260,46 @@ async function downloadBackup() {
       iv: bytesToBase64(iv),
       ciphertext: bytesToBase64(new Uint8Array(cipher)),
     },
-    url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' })),
-    link = document.createElement('a');
-  link.href = url;
-  link.download = `estuary-backup-${localDateKey()}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+    blob = new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+    name = `estuary-backup-${localDateKey()}.json`,
+    file = new File([blob], name, { type: 'application/json' });
+  const download = () => {
+    const url = URL.createObjectURL(blob),
+      link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  // On phones, offer the system share sheet (Drive, email, …). Sharing needs a fresh tap, which the
+  // password prompt has used up, so it is offered from a small dialog.
+  if (matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] }))
+    offerBackupShare(file, download);
+  else download();
+}
+function offerBackupShare(file, download) {
+  let dialog = document.getElementById('backupShareDialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'backupShareDialog';
+    dialog.className = 'backup-share-dialog';
+    dialog.innerHTML =
+      '<div class="dialog-inner"><h2>Backup ready</h2><p class="small">Share it to Drive, email or another app, or save it to this device.</p><div class="toolbar modal-actions"><button type="button" class="button ghost" data-backup-download>Download</button><button type="button" class="button primary" data-backup-share>Share</button></div></div>';
+    document.body.append(dialog);
+  }
+  dialog.querySelector('[data-backup-download]').onclick = () => {
+    dialog.close();
+    download();
+  };
+  dialog.querySelector('[data-backup-share]').onclick = async () => {
+    dialog.close();
+    try {
+      await navigator.share({ files: [file], title: 'Estuary backup' });
+    } catch (error) {
+      if (error.name !== 'AbortError') download();
+    }
+  };
+  dialog.showModal();
 }
 async function restoreBackup(event) {
   const file = event.target.files?.[0];
@@ -2589,13 +2744,9 @@ function utilityValueMissing(month, key) {
   applySvgIcons();
 })();
 
-// Estuary intentionally runs without a service worker. Remove any worker
-// registered by an older release so future loads always use the network.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker
-    .getRegistrations()
-    .then(registrations => Promise.all(registrations.map(registration => registration.unregister())));
-}
+// sw.js is network-first: the latest files load whenever online, and the last copies are used only
+// offline, so the app opens without a connection but never serves a stale release while online.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 (() => {
   const notesSvg =
@@ -2914,6 +3065,7 @@ if ('serviceWorker' in navigator) {
     if (isOwner && firebaseUser?.uid === ownerUid) {
       unlockBudget();
       render();
+      runLaunchAction();
     }
   };
 
@@ -3320,7 +3472,7 @@ if ('serviceWorker' in navigator) {
       ? `M ${x(0).toFixed(1)} ${y(trend[0]).toFixed(1)} L ${x(points.length - 1).toFixed(1)} ${y(trend[1]).toFixed(1)}`
       : '';
     const gradientId = `chart-gradient-${++gradientNumber}`;
-    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Smoothed three-month rolling average chart with trend line"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".18"/><stop offset="55%" stop-color="${color}" stop-opacity=".07"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<path class="chart-gradient-area" d="${areaPath}" fill="url(#${gradientId})"/><line class="chart-axis" x1="${left}" x2="${width - right}" y1="${baseline}" y2="${baseline}"/><path d="${trendPath}" fill="none" stroke="${color}" stroke-opacity=".5" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/><path d="${linePath}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(point.average)}" r="3.5" fill="${color}"/><circle class="chart-point" data-chart-label="${escapeHtml(point.label)}" data-chart-value="${money(point.value)}" data-chart-average="${money(point.average)}" cx="${x(index)}" cy="${y(point.average)}" r="13" fill="${color}" fill-opacity=".001"/></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${baseline}" y2="${baseline + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Smoothed three-month rolling average chart with trend line"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".18"/><stop offset="55%" stop-color="${color}" stop-opacity=".07"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<path class="chart-gradient-area" d="${areaPath}" fill="url(#${gradientId})"/><line class="chart-axis" x1="${left}" x2="${width - right}" y1="${baseline}" y2="${baseline}"/><path d="${trendPath}" fill="none" stroke="${color}" stroke-opacity=".5" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/><path class="chart-line" pathLength="1" d="${linePath}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(point.average)}" r="3.5" fill="${color}"/><circle class="chart-point" data-chart-label="${escapeHtml(point.label)}" data-chart-value="${money(point.value)}" data-chart-average="${money(point.average)}" cx="${x(index)}" cy="${y(point.average)}" r="13" fill="${color}" fill-opacity=".001"/></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${baseline}" y2="${baseline + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
   };
   render();
 })();
@@ -4077,6 +4229,12 @@ if ('serviceWorker' in navigator) {
       String(b.createdAt).localeCompare(String(a.createdAt)),
     );
     historyCountEl.textContent = `${sorted.length} entr${sorted.length === 1 ? 'y' : 'ies'}`;
+    trackChanges(
+      'income',
+      data.extraIncome,
+      entry => entry.id,
+      entry => [entry.amount, entry.month, entry.category, entry.description].join('|'),
+    );
     const row = entry => {
       const created = new Date(entry.createdAt);
       const date = entry.legacy
@@ -4085,7 +4243,7 @@ if ('serviceWorker' in navigator) {
       const action = entry.legacy
         ? '<span class="history-legacy-label">Read only</span>'
         : `<button type="button" class="history-icon-button" data-edit-extra-income="${entry.id}" aria-label="Edit extra income"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg></button><button type="button" class="history-icon-button history-delete" data-delete-extra-income="${entry.id}" aria-label="Delete extra income"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg></button>`;
-      return `<article class="history-row extra-income-row"><div class="history-row-main"><b>${entry.category}</b>${entry.description ? `<p class="history-row-comment">${escapeHtml(entry.description)}</p>` : ''}<time${entry.legacy ? '' : ` datetime="${created.toISOString()}"`}>${date}</time></div><b class="history-row-amount income">+${money(entry.amount)}</b><div class="history-actions">${action}</div></article>`;
+      return `<article class="history-row extra-income-row"${changeHighlight('income', entry.id)}><div class="history-row-main"><b>${entry.category}</b>${entry.description ? `<p class="history-row-comment">${escapeHtml(entry.description)}</p>` : ''}<time${entry.legacy ? '' : ` datetime="${created.toISOString()}"`}>${date}</time></div><b class="history-row-amount income">+${money(entry.amount)}</b><div class="history-actions">${action}</div></article>`;
     };
     historyEntriesEl.innerHTML = historyGroupsHtml(
       sorted,
@@ -4187,7 +4345,7 @@ if ('serviceWorker' in navigator) {
     data.extraIncome = data.extraIncome.filter(item => item.id !== entry.id);
     save();
     deleteCloudExtraIncome(entry);
-    render();
+    collapseThenRender(button.closest('.history-row'));
   });
   document.addEventListener('click', event => {
     if (event.target.closest?.('.nav-tab')) requestAnimationFrame(syncHeaderAction);
@@ -4372,7 +4530,7 @@ if ('serviceWorker' in navigator) {
         .join(' '),
       indexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])],
       gradientId = `investment-fill-${chartSequence++}`;
-    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".2"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${[max, max / 2, 0].map(value => `<g><line class="investment-chart-grid" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="investment-chart-axis" x="${left - 7}" y="${y(value) + 4}" text-anchor="end">${axisMoney(value)}</text></g>`).join('')}<path d="${path} L ${x(points.length - 1)} ${height - bottom} L ${x(0)} ${height - bottom} Z" fill="url(#${gradientId})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${points.map((point, index) => `<circle cx="${x(index)}" cy="${y(point.value)}" r="4" fill="${color}"><title>${escapeHtml(point.label)}: ${money(point.value)}</title></circle>`).join('')}${indexes.map(index => `<text class="investment-chart-axis" x="${x(index)}" y="${height - 8}" text-anchor="middle">${escapeHtml(points[index].label)}</text>`).join('')}</svg>`;
+    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".2"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${[max, max / 2, 0].map(value => `<g><line class="investment-chart-grid" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="investment-chart-axis" x="${left - 7}" y="${y(value) + 4}" text-anchor="end">${axisMoney(value)}</text></g>`).join('')}<path d="${path} L ${x(points.length - 1)} ${height - bottom} L ${x(0)} ${height - bottom} Z" fill="url(#${gradientId})"/><path class="chart-line" pathLength="1" d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${points.map((point, index) => `<circle cx="${x(index)}" cy="${y(point.value)}" r="4" fill="${color}"><title>${escapeHtml(point.label)}: ${money(point.value)}</title></circle>`).join('')}${indexes.map(index => `<text class="investment-chart-axis" x="${x(index)}" y="${height - 8}" text-anchor="middle">${escapeHtml(points[index].label)}</text>`).join('')}</svg>`;
   };
   const investmentBarChart = (points, color, label, emptyText) => {
     if (!points.some(point => point.value > 0))
@@ -5302,4 +5460,95 @@ function travelYearTotal(year, throughMonth = '12') {
   renderAccounts();
   syncHeaderAction();
   if (displayMode) applyDisplayMode();
+})();
+
+// Overview figures count to their new value when they change (e.g. after adding an expense).
+(() => {
+  const previous = new Map();
+  const parseMoney = text => {
+    const value = Number(String(text).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(value) ? value : null;
+  };
+  let frame = 0;
+  afterRender(() => {
+    cancelAnimationFrame(frame);
+    const changes = [...document.querySelectorAll('#metrics .metric strong')]
+      .map((element, index) => {
+        const to = parseMoney(element.textContent),
+          from = previous.get(index);
+        previous.set(index, to);
+        return { element, from, to };
+      })
+      .filter(({ from, to }) => from != null && to != null && Math.abs(to - from) >= 0.01);
+    if (
+      !changes.length ||
+      displayMode ||
+      !motionOK() ||
+      document.getElementById('overview')?.classList.contains('hidden')
+    )
+      return;
+    const start = performance.now();
+    const step = now => {
+      const progress = Math.min(1, (now - start) / 450),
+        eased = 1 - (1 - progress) ** 3;
+      changes.forEach(({ element, from, to }) => (element.textContent = money(from + (to - from) * eased)));
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    step(start);
+  });
+})();
+
+// Switching a chart's range or series redraws the charts with their draw-in animation.
+document.addEventListener('click', event => {
+  if (event.target.closest?.('[data-chart-range],[data-bill-series],[data-spending-series]'))
+    playEntrance(document.getElementById('overview'));
+});
+
+// Phones: the add button slides away while scrolling down and returns when scrolling up.
+(() => {
+  const fab = document.querySelector('.header-actions'),
+    phone = matchMedia('(max-width: 680px)');
+  if (!fab) return;
+  let lastY = scrollY;
+  addEventListener(
+    'scroll',
+    () => {
+      const y = scrollY,
+        delta = y - lastY;
+      if (Math.abs(delta) < 8) return;
+      fab.classList.toggle('fab-hidden', phone.matches && motionOK() && delta > 0 && y > 80);
+      lastY = y;
+    },
+    { passive: true },
+  );
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('.nav-tab')) fab.classList.remove('fab-hidden');
+  });
+})();
+
+// Dialog fields: the keyboard's Enter key reads Next or Done and moves on to the next field.
+(() => {
+  const fieldSelector =
+    'dialog input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=button])';
+  const fieldsIn = dialog =>
+    [...dialog.querySelectorAll('input, textarea')].filter(
+      field =>
+        field.matches(`${fieldSelector}, dialog textarea`) && field.offsetParent !== null && !field.disabled,
+    );
+  document.addEventListener('focusin', event => {
+    const field = event.target;
+    if (!field.matches?.(fieldSelector)) return;
+    const fields = fieldsIn(field.closest('dialog'));
+    field.enterKeyHint = fields.indexOf(field) < fields.length - 1 ? 'next' : 'done';
+  });
+  document.addEventListener('keydown', event => {
+    const field = event.target;
+    if (event.key !== 'Enter' || event.isComposing || !field.matches?.(fieldSelector)) return;
+    const fields = fieldsIn(field.closest('dialog')),
+      next = fields[fields.indexOf(field) + 1];
+    if (next) {
+      event.preventDefault();
+      next.focus();
+    } else if (!field.form) field.blur();
+  });
 })();
