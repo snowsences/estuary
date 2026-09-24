@@ -5031,3 +5031,35 @@ dialog .dialog-inner,
   width: 100% !important;
   min-width: 0;
 }
+
+
+/* Mobile Months tables: edge-to-edge and compact. */
+@media (max-width: 680px) {
+  #months .year-table {
+    width: calc(100% + 32px);
+    max-width: none;
+    margin-inline: -16px;
+    padding: 0 !important;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0 !important;
+  }
+
+  #months .table-wrap {
+    width: 100%;
+    padding: 0 !important;
+    border: 0;
+    border-radius: 0 !important;
+  }
+
+  #months .monthly-table,
+  #months .monthly-table input {
+    font-size: 14px !important;
+  }
+
+  #months .monthly-table th,
+  #months .monthly-table td {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+}
