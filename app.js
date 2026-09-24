@@ -655,8 +655,19 @@ const freshMonth = id => {
   };
 };
 const firebasePath = collectionName => ['users', firebaseUser.uid, collectionName];
+const financeNotesKeys = ['financeNotes', 'financeNotes2', 'financeNotes3', 'financeNotes4'];
+const financeNotesValues = source =>
+  financeNotesKeys.map(key => safeText(source?.[key], 5000));
+const hasFinanceNotes = values => values.some(value => String(value || '').trim());
+const setFinanceNotesValues = values => {
+  financeNotesKeys.forEach((key, index) => {
+    data.settings[key] = safeText(values[index], 5000);
+  });
+};
 let latestLocalSettingsUpdate = 0,
-  latestLocalInvestmentSettingsUpdate = 0;
+  latestLocalInvestmentSettingsUpdate = 0,
+  latestLocalFinanceNotesUpdate = 0,
+  lastSavedFinanceNotes = financeNotesValues(data.settings);
 const settingsTimestamp = value => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : Date.parse(value) || 0;
@@ -678,16 +689,70 @@ const investmentSettingsScore = accounts =>
 async function syncSettings() {
   if (!firebaseClient || !firebaseUser) return;
   latestLocalSettingsUpdate = Date.now();
-  const { investmentAccounts, ...generalSettings } = data.settings;
+  const {
+    investmentAccounts,
+    financeNotes: ignoredFinanceNotes,
+    financeNotes2: ignoredFinanceNotes2,
+    financeNotes3: ignoredFinanceNotes3,
+    financeNotes4: ignoredFinanceNotes4,
+    ...generalSettings
+  } = data.settings;
   try {
     await firebaseClient.setDoc(
       firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'settings'),
       { settings: generalSettings, updatedAt: latestLocalSettingsUpdate },
+      { merge: true },
     );
   } catch (error) {
     console.error(error);
     firebaseStatusMessage('Could not sync Settings. Your local changes are still saved here.');
   }
+}
+async function syncFinanceNotes() {
+  if (!firebaseClient || !firebaseUser) return false;
+  latestLocalFinanceNotesUpdate = Date.now();
+  const notes = financeNotesValues(data.settings);
+  try {
+    await firebaseClient.setDoc(
+      firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'financeNotes'),
+      { notes, updatedAt: latestLocalFinanceNotesUpdate },
+      { merge: true },
+    );
+    lastSavedFinanceNotes = [...notes];
+    return true;
+  } catch (error) {
+    console.error(error);
+    firebaseStatusMessage('Could not sync Finance Notes. Your local notes are still saved here.');
+    return false;
+  }
+}
+async function loadFinanceNotes() {
+  if (!firebaseClient || !firebaseUser) return;
+  const notesRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'financeNotes');
+  const notesSnapshot = await firebaseClient.getDoc(notesRef);
+  if (notesSnapshot.exists() && Array.isArray(notesSnapshot.data().notes)) {
+    const remote = notesSnapshot.data();
+    const notes = remote.notes.slice(0, 4).map(value => safeText(value, 5000));
+    while (notes.length < 4) notes.push('');
+    setFinanceNotesValues(notes);
+    latestLocalFinanceNotesUpdate = settingsTimestamp(remote.updatedAt);
+    lastSavedFinanceNotes = [...notes];
+    save();
+    return;
+  }
+
+  // One-time migration: prefer the legacy synced notes, then fall back to this device's copy.
+  const legacyRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'settings');
+  const legacySnapshot = await firebaseClient.getDoc(legacyRef);
+  const legacyNotes = legacySnapshot.exists()
+    ? financeNotesValues(legacySnapshot.data()?.settings)
+    : ['', '', '', ''];
+  const localNotes = financeNotesValues(data.settings);
+  const notes = hasFinanceNotes(legacyNotes) ? legacyNotes : localNotes;
+  setFinanceNotesValues(notes);
+  lastSavedFinanceNotes = [...notes];
+  save();
+  await syncFinanceNotes();
 }
 async function syncInvestmentSettings() {
   if (!firebaseClient || !firebaseUser) return;
@@ -923,6 +988,7 @@ async function migrateLocalData() {
     existing = await firebaseClient.getDocs(monthsCollection);
   if (!existing.empty) return false;
   await syncSettings();
+  await syncFinanceNotes();
   await syncInvestmentSettings();
   await Promise.all(data.months.map(syncMonth));
   await Promise.all(
@@ -974,6 +1040,7 @@ function subscribeFirebase() {
   firebaseSettingsReady = false;
   firebaseMonthsReady = false;
   const settingsRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'settings');
+  const financeNotesRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'financeNotes');
   const investmentSettingsRef = firebaseClient.doc(
     firebaseClient.db,
     ...firebasePath('budget'),
@@ -995,8 +1062,14 @@ function subscribeFirebase() {
           remoteUpdatedAt = settingsTimestamp(remote.updatedAt);
         if (!(remoteUpdatedAt && remoteUpdatedAt < latestLocalSettingsUpdate)) {
           latestLocalSettingsUpdate = Math.max(latestLocalSettingsUpdate, remoteUpdatedAt);
-          const { investmentAccounts: ignoredLegacyInvestmentAccounts, ...remoteGeneralSettings } =
-            remote.settings;
+          const {
+            investmentAccounts: ignoredLegacyInvestmentAccounts,
+            financeNotes: ignoredLegacyFinanceNotes,
+            financeNotes2: ignoredLegacyFinanceNotes2,
+            financeNotes3: ignoredLegacyFinanceNotes3,
+            financeNotes4: ignoredLegacyFinanceNotes4,
+            ...remoteGeneralSettings
+          } = remote.settings;
           if (!Object.hasOwn(remoteGeneralSettings, 'mortgagePayment'))
             remoteGeneralSettings.mortgagePayment = round(
               num(remoteGeneralSettings.kevinMortgage ?? data.settings.kevinMortgage) +
@@ -1011,6 +1084,21 @@ function subscribeFirebase() {
       }
       firebaseSettingsReady = true;
       maybeLockSavedMonths();
+      save();
+      render();
+    }),
+  );
+  firebaseUnsubscribers.push(
+    firebaseClient.onSnapshot(financeNotesRef, snapshot => {
+      if (!snapshot.exists() || !Array.isArray(snapshot.data().notes)) return;
+      const remote = snapshot.data(),
+        remoteUpdatedAt = settingsTimestamp(remote.updatedAt);
+      if (remoteUpdatedAt && remoteUpdatedAt < latestLocalFinanceNotesUpdate) return;
+      const notes = remote.notes.slice(0, 4).map(value => safeText(value, 5000));
+      while (notes.length < 4) notes.push('');
+      latestLocalFinanceNotesUpdate = Math.max(latestLocalFinanceNotesUpdate, remoteUpdatedAt);
+      setFinanceNotesValues(notes);
+      lastSavedFinanceNotes = [...notes];
       save();
       render();
     }),
@@ -1148,6 +1236,8 @@ function clearPrivateLocalData() {
   data.months.sort((a, b) => a.id.localeCompare(b.id));
   active = data.months.find(month => month.id === currentMonthKey())?.id || data.months.at(-1).id;
   selectedYear = String(currentYear);
+  latestLocalFinanceNotesUpdate = 0;
+  lastSavedFinanceNotes = financeNotesValues(data.settings);
 }
 async function onFirebaseUser(user) {
   firebaseUser = user;
@@ -1170,6 +1260,7 @@ async function onFirebaseUser(user) {
   firebaseStatusMessage('Syncing as ' + (user.email || 'your Google account') + '…');
   try {
     const moved = await migrateLocalData();
+    await loadFinanceNotes();
     await loadInvestmentSettings();
     subscribeFirebase();
     firebaseStatusMessage(
@@ -2349,6 +2440,7 @@ async function restoreBackup(event) {
     active = data.months.find(month => month.id === currentMonthKey())?.id || data.months.at(-1).id;
     save();
     await syncSettings();
+    await syncFinanceNotes();
     await Promise.all(data.months.map(syncMonth));
     await Promise.all(
       data.entries.map(entry => {
@@ -3233,7 +3325,6 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       mortgageField.append(mortgageInput);
       fixedInput.closest('label')?.before(mortgageField);
     }
-    const financeNotesKeys = ['financeNotes', 'financeNotes2', 'financeNotes3', 'financeNotes4'];
     let financeNotesInputs = [...document.querySelectorAll('[data-finance-notes]')];
     if (!financeNotesInputs.length) {
       const notesField = document.createElement('label');
@@ -3266,14 +3357,25 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       notesSaveButton.className = 'button primary';
       notesSaveButton.textContent = 'Save Notes';
       notesSaveButton.addEventListener('click', async () => {
-        financeNotesKeys.forEach((key, index) => {
-          data.settings[key] = safeText(financeNotesInputs[index].value, 5000);
-        });
+        const notes = financeNotesInputs.map(input => safeText(input.value, 5000));
+        const clearedNotes = notes.filter(
+          (note, index) => !String(note).trim() && String(lastSavedFinanceNotes[index] || '').trim(),
+        ).length;
+        if (
+          clearedNotes &&
+          !window.confirm(
+            clearedNotes === 1
+              ? 'Clear this saved Finance Note?'
+              : `Clear these ${clearedNotes} saved Finance Notes?`,
+          )
+        )
+          return;
+        setFinanceNotesValues(notes);
         save();
         notesSaveButton.disabled = true;
         notesSaveButton.textContent = 'Saving…';
-        await syncSettings();
-        notesSaveButton.textContent = 'Saved';
+        const synced = await syncFinanceNotes();
+        notesSaveButton.textContent = synced || !firebaseUser ? 'Saved' : 'Saved locally';
         window.setTimeout(() => {
           notesSaveButton.disabled = false;
           notesSaveButton.textContent = 'Save Notes';

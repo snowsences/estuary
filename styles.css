@@ -4926,3 +4926,94 @@ dialog .dialog-inner,
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* Compact typography for Overview, Accounts, and Investments. */
+:is(#overview, #accounts, #investments) {
+  font-size: 14px !important;
+}
+:is(#overview, #accounts, #investments) :is(button, input, select, textarea, .small, .eyebrow) {
+  font-size: 14px !important;
+}
+:is(#overview, #accounts, #investments) h2 {
+  font-size: 19px;
+}
+
+/* Overview */
+#overview :is(.metric p, .metric span) {
+  font-size: 14px !important;
+}
+#overview .metric strong {
+  font-size: 18px !important;
+}
+#overview .metric-expense-delta {
+  font-size: 13px !important;
+}
+#overview .overview-insight {
+  font-size: 13px;
+}
+#overview :is(.chart-tabs button, .bill-tabs button, .chart-value, .chart-empty) {
+  font-size: 14px !important;
+}
+#overview .chart-card h3 {
+  font-size: 18px;
+}
+#overview :is(.chart-subtitle, .chart-average) {
+  font-size: 12px;
+}
+.chart-tooltip {
+  font-size: 12px;
+}
+
+/* Accounts */
+#accounts .accounts-group-head h3 {
+  font-size: 19px;
+}
+#accounts .account-card-title h4 {
+  font-size: 17px;
+}
+/* Investments */
+#investments .investment-summary-card h3 {
+  font-size: 16px;
+}
+#investments .investment-donut-total {
+  font-size: 20px;
+}
+#investments .investment-legend span {
+  font-size: 11px;
+}
+#investments .investment-account-card h3 {
+  font-size: 18px;
+}
+#investments :is(.investment-account-type, .investment-account-stat span, .investment-settings-row label, .investment-archived-heading) {
+  font-size: 11px;
+}
+#investments .investment-account-stat strong {
+  font-size: 18px;
+}
+#investments .investment-account-stat.balance strong {
+  font-size: 26px;
+}
+#investments .investment-chart h4 {
+  font-size: 13px;
+}
+#investments .investment-chart p {
+  font-size: 11px;
+}
+#investments .investment-chart-axis {
+  font-size: 10px;
+}
+#investments .investment-goal-label {
+  font-size: 10px !important;
+}
+#investments .investment-ledger > summary b {
+  font-size: 18px;
+}
+#investments .investment-account-stat.gain strong small {
+  font-size: 11px;
+}
+#investments .investment-summary-card .investment-gain-summary {
+  font-size: 12px;
+}
+#investments .history-entry b {
+  font-size: 14px !important;
+}
