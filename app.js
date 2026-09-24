@@ -496,23 +496,21 @@ data.months.sort((a, b) => a.id.localeCompare(b.id));
 let active = data.months.find(month => month.id.startsWith(String(currentYear)))?.id || data.months.at(-1).id,
   selectedYear = String(currentYear);
 const save = () => localStorage.setItem(key, JSON.stringify(data));
-function total(m) {
-  const s = data.settings,
-    utilities = m.water + m.electricity + m.gas,
-    kevinFood = (m.groceries * s.foodShare) / 100,
-    megan = m.groceries * (1 - s.foodShare / 100) + s.meganR1 + s.meganR2,
-    expenses = s.fixedExpenses + s.kevinMortgage + utilities + kevinFood - m.cashOffset;
-  return { utilities, megan, expenses, saved: s.monthlyIncome - expenses - m.spending };
-}
-function monthTable(months) {
-  return `<div class="table-wrap"><table class="table"><thead><tr><th>Month</th><th>Water</th><th>Electricity</th><th>Gas</th><th>Groceries</th><th>Spending</th><th>Megan owes</th><th>Saved</th><th aria-label="Actions"></th></tr></thead><tbody>${months
-    .map(x => {
-      const q = total(x);
-      return `<tr><th>${x.label}</th>${['water', 'electricity', 'gas', 'groceries'].map(k => `<td><input type="number" data-month="${x.id}" data-key="${k}" value="${round(x[k])}"></td>`).join('')}<td><div class="spending-cell"><input type="number" data-month="${x.id}" data-key="spending" value="${round(x.spending)}"><button class="notes-button ${x.notes ? 'has-notes' : ''}" data-notes-month="${x.id}" aria-label="Edit notes for ${x.label}" title="${x.notes ? 'Edit notes' : 'Add notes'}">▤</button></div></td><td class="megan">${money(q.megan)}</td><td class="saved">${money(q.saved)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${x.id}">Add cash offset</button></div></details></td></tr>`;
-    })
-    .join('')}</tbody></table></div>`;
-}
+
+// render() redraws the app from `data`. Each feature hooks into it rather than wrapping it:
+// - beforeRender(step) runs before drawing, newest step first; a step returning false skips the render.
+// - afterRender(step) runs once the core view is drawn, in the order the steps were registered.
+const beforeRenderSteps = [];
+const afterRenderSteps = [];
+const beforeRender = step => beforeRenderSteps.unshift(step);
+const afterRender = step => afterRenderSteps.push(step);
 function render() {
+  for (const step of beforeRenderSteps) if (step() === false) return;
+  renderCore();
+  for (const step of afterRenderSteps) step();
+}
+
+function renderCore() {
   const m = data.months.find(x => x.id === active),
     today = new Date(),
     calendarYear = today.getFullYear(),
@@ -721,24 +719,6 @@ async function syncMonth(month) {
   } catch (error) {
     console.error(error);
     firebaseStatusMessage('Could not sync this month. Your local changes are still saved here.');
-  }
-}
-async function addCloudExpense(entry, keyName) {
-  if (!firebaseClient || !firebaseUser) return;
-  const monthId = entry.month,
-    monthRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('months'), monthId),
-    entryRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('expenses'), entry.id);
-  try {
-    await firebaseClient.runTransaction(firebaseClient.db, async transaction => {
-      const snapshot = await transaction.get(monthRef),
-        remote = cleanMonth(snapshot.exists() ? snapshot.data() : freshMonth(monthId));
-      remote[keyName] = round(remote[keyName] + entry.final);
-      transaction.set(monthRef, { ...remote, updatedAt: new Date().toISOString() });
-    });
-    await firebaseClient.setDoc(entryRef, entry);
-  } catch (error) {
-    console.error(error);
-    firebaseStatusMessage('Could not sync this expense yet. It remains saved on this device.');
   }
 }
 async function addCloudCashOffset(monthId, amount) {
@@ -1195,24 +1175,6 @@ async function signOutFirebase() {
   render();
 }
 window.addEventListener('firebase-sdk-ready', connectFirebase);
-/* Legacy Dropbox implementation retained only for backwards-compatible local data; Firebase is the active sync provider.
-const redirectUri=()=>location.origin+location.pathname;
-const b64url=bytes=>btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
-async function connectDropbox(){const appKey=data.dropbox.appKey.trim();if(!appKey){notice.textContent='Paste your Dropbox App key first.';return}const verifier=b64url(crypto.getRandomValues(new Uint8Array(48)));const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));localStorage.setItem(localKeys.pkce,JSON.stringify({verifier,redirectUri:redirectUri()}));const params=new URLSearchParams({client_id:appKey,response_type:'code',redirect_uri:redirectUri(),code_challenge:b64url(new Uint8Array(digest)),code_challenge_method:'S256',token_access_type:'online',scope:'account_info.read files.metadata.read files.content.read files.content.write'});location.assign('https://www.dropbox.com/oauth2/authorize?'+params)}
-async function finishDropboxLogin(){const code=new URLSearchParams(location.search).get('code'),pkce=JSON.parse(localStorage.getItem(localKeys.pkce)||'null');if(!code||!pkce)return;notice.textContent='Finishing Dropbox sign-in…';try{const body=new URLSearchParams({code,grant_type:'authorization_code',client_id:data.dropbox.appKey,code_verifier:pkce.verifier,redirect_uri:pkce.redirectUri});const tokenResponse=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});if(!tokenResponse.ok)throw new Error(await tokenResponse.text());const token=await tokenResponse.json();const accountResponse=await fetch('https://api.dropboxapi.com/2/users/get_current_account',{method:'POST',headers:{Authorization:'Bearer '+token.access_token}});if(!accountResponse.ok)throw new Error(await accountResponse.text());const account=await accountResponse.json();data.dropbox.accessToken=token.access_token;data.dropbox.name=account.name?.display_name||account.email||'Dropbox';save();history.replaceState({},'',redirectUri());notice.textContent='Dropbox connected. Your workbook path is ready for sync.';render()}catch(error){notice.textContent='Dropbox sign-in did not finish. Check the redirect URI and app permissions, then try again.';console.error(error)}finally{localStorage.removeItem(localKeys.pkce)}}
-const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const cellValue=(sheet,address)=>{const value=sheet[address]?.v;return typeof value==='number'&&Number.isFinite(value)?round(value):0};
-const workbookNumber=(sheet,address)=>{const value=sheet[address]?.v;return typeof value==='number'&&Number.isFinite(value)?round(value):null};
-async function fetchWorkbook(){if(!data.dropbox.accessToken)throw new Error('Connect Dropbox first.');const meta=await fetch('https://api.dropboxapi.com/2/files/get_metadata',{method:'POST',headers:{Authorization:'Bearer '+data.dropbox.accessToken,'Content-Type':'application/json'},body:JSON.stringify({path:data.dropbox.filePath})});if(!meta.ok)throw new Error(await meta.text());const metadata=await meta.json();const downloaded=await fetch('https://content.dropboxapi.com/2/files/download',{method:'POST',headers:{Authorization:'Bearer '+data.dropbox.accessToken,'Dropbox-API-Arg':JSON.stringify({path:data.dropbox.filePath})}});if(!downloaded.ok)throw new Error(await downloaded.text());return {book:XLSX.read(await downloaded.arrayBuffer(),{type:'array',cellFormula:true}),revision:metadata.rev};}
-function importBudget(book,revision){const sheet=book.Sheets.Budget;if(!sheet)throw new Error('No worksheet named “Budget” was found.');let year='',rowMap={},imported=[];const range=XLSX.utils.decode_range(sheet['!ref']||'A1:A1');for(let row=range.s.r;row<=range.e.r;row++){const a=sheet[XLSX.utils.encode_cell({r:row,c:0})]?.v;const text=String(a||'').trim();const yearMatch=text.match(/(?:~)?(20\d{2})(?:~)?/);if(yearMatch&&text.includes('~')){year=yearMatch[1];continue}const index=monthNames.findIndex(name=>name.toLowerCase()===text.toLowerCase());if(index<0||!year)continue;const id=`${year}-${String(index+1).padStart(2,'0')}`,excelRow=row+1;imported.push({id,label:`${monthNames[index]} ${year}`,water:cellValue(sheet,`B${excelRow}`),electricity:cellValue(sheet,`C${excelRow}`),gas:cellValue(sheet,`D${excelRow}`),groceries:cellValue(sheet,`F${excelRow}`),spending:cellValue(sheet,`I${excelRow}`),cashOffset:cellValue(sheet,`P${excelRow}`),notes:String(sheet[`O${excelRow}`]?.v||'')});rowMap[id]=excelRow}if(!imported.length)throw new Error('No month rows were found in column A.');data.months=imported;ensureYear(currentYear);ensureYear(currentYear+1);data.months.sort((a,b)=>a.id.localeCompare(b.id));data.dropbox.rowMap=rowMap;data.dropbox.revision=revision;for(const [key,cell] of Object.entries({fixedExpenses:'U2',kevinMortgage:'R2',monthlyIncome:'R9',meganR1:'R4',meganR2:'R5'})){const value=workbookNumber(sheet,cell);if(value!==null)data.settings[key]=value}const formulaRow=imported.find(month=>sheet[`G${rowMap[month.id]}`]?.f);const formula=String(formulaRow?sheet[`G${rowMap[formulaRow.id]}`]?.f||'':'');const share=formula.match(/\*\s*(0?\.\d+|1(?:\.0+)?)/);if(share)data.settings.foodShare=round(Number(share[1])*100);active=`${currentYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`;save();}
-const importBudgetWithoutMortgageTotal=importBudget;importBudget=(book,revision)=>{importBudgetWithoutMortgageTotal(book,revision);data.settings.mortgagePayment=round(num(data.settings.kevinMortgage)+num(data.settings.meganR1));save()};
-async function pullFromDropbox(){notice.textContent='Pulling your Budget workbook from Dropbox…';try{const {book,revision}=await fetchWorkbook();importBudget(book,revision);notice.textContent='Budget imported from Dropbox.';render()}catch(error){notice.textContent='Could not pull the workbook. Confirm the path, scopes, and worksheet name.';console.error(error)}}
-function setCell(sheet,address,value){sheet[address]={t:typeof value==='number'?'n':'s',v:typeof value==='number'?round(value):value};}
-function setFormula(sheet,address,formula,cachedValue){sheet[address]={...(sheet[address]||{}),t:'n',f:formula,v:round(cachedValue)};}
-function percentageFactor(value){return String(round(Math.max(0,Math.min(100,num(value)))/100));}
-function applyBudgetChanges(book){const sheet=book.Sheets.Budget;if(!sheet)throw new Error('No worksheet named “Budget” was found.');const settings=data.settings,foodFactor=percentageFactor(settings.foodShare),meganFoodFactor=percentageFactor(100-settings.foodShare);setCell(sheet,'P1','Cash offset');(sheet['!cols']||=[])[15]={hidden:true};const fixedComponentTotal=['U3','U4','U5','U6','U7','U8','U9','U10'].reduce((sum,cell)=>sum+num(sheet[cell]?.v),0);setCell(sheet,'T16','ESTUARY FIXED-EXPENSE ADJUSTMENT');setCell(sheet,'U16',round(settings.fixedExpenses-fixedComponentTotal));setFormula(sheet,'U2','SUM(U3:U10)+U16',settings.fixedExpenses);setCell(sheet,'R4',settings.meganR1);setCell(sheet,'R7',round(settings.monthlyIncome*12/26));setFormula(sheet,'R9','PRODUCT((R7*26))/12',settings.monthlyIncome);setCell(sheet,'U15',round(settings.kevinMortgage+settings.meganR1));setFormula(sheet,'R2','PRODUCT(U15-R4)',settings.kevinMortgage);const meganOtherStatic=num(sheet.U10?.v)+num(sheet.U11?.v)+num(sheet.U12?.v);setCell(sheet,'U13',round(settings.meganR2-meganOtherStatic));setFormula(sheet,'R5','PRODUCT(U12+U13+U11+U10)',settings.meganR2);for(const month of data.months){const row=data.dropbox.rowMap?.[month.id];if(!row)continue;setCell(sheet,`B${row}`,month.water);setCell(sheet,`C${row}`,month.electricity);setCell(sheet,`D${row}`,month.gas);setCell(sheet,`F${row}`,month.groceries);setFormula(sheet,`G${row}`,`PRODUCT(F${row}*${foodFactor})`,month.groceries*Number(foodFactor));setFormula(sheet,`L${row}`,`PRODUCT(F${row}*${meganFoodFactor})`,month.groceries*Number(meganFoodFactor));setCell(sheet,`I${row}`,month.spending);setCell(sheet,`O${row}`,month.notes||'');setCell(sheet,`P${row}`,month.cashOffset);const j=sheet[`J${row}`];if(j?.f&&!j.f.includes(`P${row}`))j.f=`(${j.f})+P${row}`;}const ledger=XLSX.utils.aoa_to_sheet([['Timestamp','Month','Type','Original amount','Modifier','Final amount'],...data.entries.map(e=>[e.createdAt,e.month,e.type,e.original,e.modifier,e.final])]);book.Sheets['Estuary Ledger']=ledger;if(!book.SheetNames.includes('Estuary Ledger'))book.SheetNames.push('Estuary Ledger');}
-async function pushToDropbox(){notice.textContent='Preparing your workbook for Dropbox…';try{const {book,revision}=await fetchWorkbook();if(data.dropbox.revision&&revision!==data.dropbox.revision&&!confirm('The workbook changed in Dropbox since your last pull. Push your current app totals anyway?')){notice.textContent='Push cancelled. Pull from Dropbox first to review its newer data.';return}applyBudgetChanges(book);const bytes=XLSX.write(book,{bookType:'xlsx',type:'array'});const upload=await fetch('https://content.dropboxapi.com/2/files/upload',{method:'POST',headers:{Authorization:'Bearer '+data.dropbox.accessToken,'Content-Type':'application/octet-stream','Dropbox-API-Arg':JSON.stringify({path:data.dropbox.filePath,mode:{'.tag':'update',update:revision},autorename:false,mute:false})},body:bytes});if(!upload.ok)throw new Error(await upload.text());const saved=await upload.json();data.dropbox.revision=saved.rev;save();notice.textContent='Budget workbook updated in Dropbox.';render()}catch(error){notice.textContent='Could not push the workbook. Pull it first, then check your Dropbox permissions.';console.error(error)}}
-*/
 function addCashOffset(monthId) {
   const amount = num(prompt('Bulk cash received that should reduce this month’s expenses:'));
   if (amount > 0) {
@@ -1385,73 +1347,21 @@ function currentMonthKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
+function previousMonthId(monthId) {
+  const [year, month] = monthId.split('-').map(Number);
+  const date = new Date(year, month - 2, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
 function chartMonths() {
   const completed = data.months.filter(month => month.id <= currentMonthKey());
   if (chartRange === 'all') return completed;
   return completed.slice(-Number(chartRange) * 12);
 }
-function chartSvg(values) {
-  if (!values.length) return '<div class="chart-empty">No monthly data yet.</div>';
-  const width = 480,
-    height = 160,
-    pad = 12,
-    min = Math.min(0, ...values),
-    max = Math.max(0, ...values),
-    range = max - min || 1,
-    points = values
-      .map(
-        (value, index) =>
-          `${pad + (index * (width - pad * 2)) / Math.max(values.length - 1, 1)},${height - pad - ((value - min) / range) * (height - pad * 2)}`,
-      )
-      .join(' ');
-  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true"><line x1="${pad}" x2="${width - pad}" y1="${height - pad}" y2="${height - pad}" stroke="currentColor" opacity=".18"/><polyline points="${points}" fill="none" stroke="var(--orange)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
-}
-function chartCard(title, values, extra = '') {
-  const latest = values.at(-1) || 0;
-  return `<article class="chart-card"><div class="chart-card-head"><h3>${title}</h3>${extra}</div><p class="chart-value">Latest: ${money(latest)}</p>${chartSvg(values)}</article>`;
-}
-function renderCharts() {
-  const months = chartMonths(),
-    series = {
-      water: months.map(month => month.water),
-      electricity: months.map(month => month.electricity),
-      gas: months.map(month => month.gas),
-      food: months.map(month => month.groceries),
-      spending: months.map(month => month.spending),
-      savings: months.map(month => total(month).saved),
-    },
-    rangeLabel = chartRange === 'all' ? 'All time' : `${chartRange} years`;
-  chartArea.innerHTML = `<div class="chart-controls"><h2>Cost over time</h2><div class="chart-tabs">${[
-    ['2', '2 yrs'],
-    ['5', '5 yrs'],
-    ['all', 'All time'],
-  ]
-    .map(
-      ([value, label]) =>
-        `<button class="${chartRange === value ? 'selected' : ''}" data-chart-range="${value}">${label}</button>`,
-    )
-    .join('')}</div></div><div class="chart-grid">${chartCard(
-    'Bills',
-    series[billMetric],
-    `<div class="bill-tabs">${[
-      ['water', 'Water'],
-      ['electricity', 'Electricity'],
-      ['gas', 'Gas'],
-    ]
-      .map(
-        ([value, label]) =>
-          `<button class="${billMetric === value ? 'selected' : ''}" data-bill-series="${value}">${label}</button>`,
-      )
-      .join('')}</div>`,
-  )}${chartCard('Food', series.food)}${chartCard('Spending', series.spending)}${chartCard('Savings', series.savings)}</div><p class="small" style="margin-top:10px">${rangeLabel} · through ${months.at(-1)?.label || 'today'}</p>`;
-}
-const baseRender = render;
-render = () => {
+beforeRender(() => {
   const current = data.months.find(month => month.id === currentMonthKey());
   if (current) active = current.id;
-  baseRender();
-  renderCharts();
-};
+});
+afterRender(() => renderCharts());
 document.addEventListener('click', event => {
   const rangeButton = event.target.closest('[data-chart-range]');
   const billButton = event.target.closest('[data-bill-series]');
@@ -1464,23 +1374,7 @@ document.addEventListener('click', event => {
     renderCharts();
   }
 });
-function renderHistory() {
-  const sorted = [...data.entries].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  historyCount.textContent = `${sorted.length} expense${sorted.length === 1 ? '' : 's'}`;
-  historyEntries.innerHTML = sorted.length
-    ? sorted
-        .map(entry => {
-          const label = data.months.find(month => month.id === entry.month)?.label || entry.month;
-          return `<article class="history-entry"><span><small>Date</small><b>${new Date(entry.createdAt).toLocaleString()}</b></span><span><small>Month · Type</small><b>${label} · ${entry.type}</b></span><span><small>Amount · modifier · final</small><b>${money(entry.original)} × ${round(entry.modifier).toFixed(2)} = ${money(entry.final)}</b></span><span><small>Entry ID</small><b>${entry.id || '—'}</b></span>${entry.comment ? `<span class="history-comment"><small>Comment</small>${escapeHtml(entry.comment)}</span>` : ''}</article>`;
-        })
-        .join('')
-    : '<div class="chart-empty">Expenses you add will appear here.</div>';
-}
-const chartRender = render;
-render = () => {
-  chartRender();
-  renderHistory();
-};
+afterRender(() => renderHistory());
 render();
 document.getElementById('closeExpense').onclick = () => dialog.close();
 function rollingAverage(points, window = 3) {
@@ -1489,34 +1383,6 @@ function rollingAverage(points, window = 3) {
       average = slice.reduce((sum, item) => sum + item.value, 0) / slice.length;
     return { ...point, average: round(average) };
   });
-}
-function chartSvg(points, color) {
-  if (!points.length) return '<div class="chart-empty">No monthly data yet.</div>';
-  const width = 520,
-    height = 220,
-    left = 52,
-    right = 16,
-    top = 18,
-    bottom = 42,
-    plotWidth = width - left - right,
-    plotHeight = height - top - bottom,
-    values = points.map(point => point.average),
-    min = Math.min(0, ...values),
-    max = Math.max(0, ...values),
-    range = max - min || 1,
-    x = index => left + (index * plotWidth) / Math.max(points.length - 1, 1),
-    y = value => top + ((max - value) * plotHeight) / range,
-    yTicks = [max, round((max + min) / 2), min],
-    xIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])],
-    path = points
-      .map((point, index) => `${index ? 'L' : 'M'} ${x(index).toFixed(1)} ${y(point.average).toFixed(1)}`)
-      .join(' ');
-  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Three-month rolling average chart">${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<line class="chart-axis" x1="${left}" x2="${width - right}" y1="${height - bottom}" y2="${height - bottom}"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(point.average)}" r="3.5" fill="${color}"/><circle class="chart-point" cx="${x(index)}" cy="${y(point.average)}" r="10" fill="${color}" fill-opacity=".001"><title>${point.label}: ${money(point.value)}\n3-month average: ${money(point.average)}</title></circle></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${height - bottom}" y2="${height - bottom + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
-}
-function chartCard(title, points, color, extra = '') {
-  const smoothed = rollingAverage(points),
-    latest = smoothed.at(-1);
-  return `<article class="chart-card"><div class="chart-card-head"><div><h3>${title}</h3><p class="chart-subtitle">3-month rolling average</p></div>${extra}</div><p class="chart-value">Latest: ${money(latest?.value || 0)}</p>${chartSvg(smoothed, color)}</article>`;
 }
 function renderCharts() {
   const months = chartMonths(),
@@ -1612,27 +1478,6 @@ function escapeHtml(value) {
     /[&<>"']/g,
     character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
   );
-}
-function monthTable(months) {
-  return `<div class="table-wrap"><table class="table monthly-table"><thead><tr><th>Month</th><th>Saved</th><th>Spending</th><th>Food</th><th>Water</th><th>Electricity</th><th>Gas</th><th>Megan owes</th><th aria-label="Actions"></th></tr></thead><tbody>${months
-    .map(month => {
-      const values = total(month),
-        label = `${monthLabels[Number(month.id.slice(5, 7)) - 1].slice(0, 3)} '${month.id.slice(2, 4)}`;
-      return `<tr><th>${label}</th><td class="saved">${money(values.saved)}</td><td><div class="spending-cell"><input type="number" data-month="${month.id}" data-key="spending" value="${round(month.spending)}"><button class="notes-button ${month.notes ? 'has-notes' : ''}" data-notes-month="${month.id}" aria-label="Edit notes for ${month.label}" title="${month.notes ? 'Edit notes' : 'Add notes'}">▤</button></div></td><td><input type="number" data-month="${month.id}" data-key="groceries" value="${round(month.groceries)}"></td>${['water', 'electricity', 'gas'].map(key => `<td><input type="number" data-month="${month.id}" data-key="${key}" value="${round(month[key])}"></td>`).join('')}<td class="megan">${money(values.megan)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${month.id}">Add cash offset</button></div></details></td></tr>`;
-    })
-    .join('')}</tbody></table></div>`;
-}
-function renderHistory() {
-  const sorted = [...data.entries].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  historyCount.textContent = `${sorted.length} expense${sorted.length === 1 ? '' : 's'}`;
-  historyEntries.innerHTML = sorted.length
-    ? sorted
-        .map(entry => {
-          const label = data.months.find(month => month.id === entry.month)?.label || entry.month;
-          return `<article class="history-entry"><span><small>Date</small><b>${new Date(entry.createdAt).toLocaleString()}</b></span><span><small>Month · Type</small><b>${label} · ${entry.type}</b></span><span><small>Amount · modifier · final</small><b>${money(entry.original)} × ${round(entry.modifier).toFixed(2)} = ${money(entry.final)}</b></span>${entry.comment ? `<span class="history-comment">${escapeHtml(entry.comment)}</span>` : ''}</article>`;
-        })
-        .join('')
-    : '<div class="chart-empty">Expenses you add will appear here.</div>';
 }
 function trendPoints(values) {
   const count = values.length;
@@ -1752,11 +1597,7 @@ function renderMonthlyTimeline() {
     })
     .join('');
 }
-const timelineRender = render;
-render = () => {
-  timelineRender();
-  renderMonthlyTimeline();
-};
+afterRender(() => renderMonthlyTimeline());
 document.getElementById('closeNotes').onclick = () => notesDialog.close();
 document.querySelectorAll('dialog').forEach(modal =>
   modal.addEventListener('click', event => {
@@ -1808,11 +1649,7 @@ displayModeToggle.onchange = () => {
   localStorage.setItem(localKeys.displayMode, displayMode ? 'on' : 'off');
   render();
 };
-const displayRender = render;
-render = () => {
-  displayRender();
-  applyDisplayMode();
-};
+afterRender(() => applyDisplayMode());
 let deferredInstallPrompt = null;
 const installBanner = document.getElementById('installBanner');
 window.addEventListener('beforeinstallprompt', event => {
@@ -1976,19 +1813,15 @@ function updateSavingsMetricLabels() {
   if (labels[2]) labels[2].textContent = `${year} Monthly Savings`;
   if (labels[3]) labels[3].textContent = `${year} Yearly Savings`;
 }
-const savingsLabelsRender = render;
-render = () => {
-  savingsLabelsRender();
-  updateSavingsMetricLabels();
-};
-const incomeHistoryRender = render;
-render = () => {
+afterRender(() => updateSavingsMetricLabels());
+beforeRender(() => {
   normalizeIncomeLevels();
   lockCompletedIncomeMonths();
-  incomeHistoryRender();
+});
+afterRender(() => {
   renderIncomeLevels();
   if (displayMode) applyDisplayMode();
-};
+});
 render();
 document.querySelectorAll('.tab').forEach(
   button =>
@@ -2307,19 +2140,11 @@ async function restoreBackup(event) {
     alert('That backup could not be restored. Check the password and file.');
   }
 }
-const backupReminderRender = render;
-render = () => {
-  backupReminderRender();
+afterRender(() => {
   setupBackupTools();
   maybeShowMeganReminder();
-};
+});
 render();
-function utilityValueMissing(month, key) {
-  const now = new Date(),
-    offset = key === 'water' ? -2 : -1,
-    cutoff = `${new Date(now.getFullYear(), now.getMonth() + offset, 1).getFullYear()}-${String(new Date(now.getFullYear(), now.getMonth() + offset, 1).padStart ? new Date(now.getFullYear(), now.getMonth() + offset, 1).getMonth() + 1 : new Date(now.getFullYear(), now.getMonth() + offset, 1).getMonth() + 1).padStart(2, '0')}`;
-  return month.id <= cutoff && num(month[key]) === 0;
-}
 function renderUtilityAlert() {
   const alert = document.getElementById('utilityAlert');
   if (!alert) return;
@@ -2334,11 +2159,7 @@ function renderUtilityAlert() {
   }
   alert.textContent = `Utility values still needed — ${missing.map(([key, months]) => `${names[key]}: ${months.map(month => `${monthLabels[Number(month.id.slice(5, 7)) - 1].slice(0, 3)} '${month.id.slice(2, 4)}`).join(', ')}`).join(' · ')}`;
 }
-const utilityAlertRender = render;
-render = () => {
-  utilityAlertRender();
-  renderUtilityAlert();
-};
+afterRender(() => renderUtilityAlert());
 async function addCloudExpense(entry, keyName, notes) {
   if (!firebaseClient || !firebaseUser) return;
   const monthRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('months'), entry.month),
@@ -2669,11 +2490,7 @@ function utilityValueMissing(month, key) {
     iconsHistoryRender();
     applySvgIcons();
   };
-  const iconsRender = render;
-  render = () => {
-    iconsRender();
-    applySvgIcons();
-  };
+  afterRender(applySvgIcons);
   applySvgIcons();
 })();
 
@@ -2997,11 +2814,9 @@ if ('serviceWorker' in navigator) {
     await signInFirebase();
   };
 
-  const gatedRender = render;
-  render = () => {
-    if (!authorizedSession) return;
-    gatedRender();
-  };
+  beforeRender(() => {
+    if (!authorizedSession) return false;
+  });
 
   const firebaseUserHandler = onFirebaseUser;
   onFirebaseUser = async user => {
@@ -3013,7 +2828,7 @@ if ('serviceWorker' in navigator) {
     await firebaseUserHandler(user);
     if (isOwner && firebaseUser?.uid === ownerUid) {
       unlockBudget();
-      gatedRender();
+      render();
     }
   };
 
@@ -3315,11 +3130,7 @@ if ('serviceWorker' in navigator) {
     const secondPanel = host.querySelector('[data-expense-settings-panel="two"]');
     secondPanel.innerHTML = `<p class="small">These values add up to Fixed monthly expenses.</p><div class="fixed-expense-items">${data.settings.fixedExpenseItems.map(item => `<div class="fixed-expense-row"><input type="text" aria-label="Expense name" data-fixed-expense-field="label" data-fixed-expense-id="${item.id}" value="${escapeHtml(item.label)}"><input type="number" inputmode="decimal" aria-label="Expense amount" data-fixed-expense-field="amount" data-fixed-expense-id="${item.id}" value="${round(item.amount)}"><button type="button" class="fixed-expense-remove" data-remove-fixed-expense="${item.id}" aria-label="Remove ${escapeHtml(item.label)}" ${data.settings.fixedExpenseItems.length === 1 ? 'disabled' : ''}>×</button></div>`).join('')}</div><div class="fixed-expense-actions"><button type="button" class="button ghost" data-add-fixed-expense>+ Add expense</button></div>`;
   };
-  const settingsRender = render;
-  render = () => {
-    settingsRender();
-    setupExpenseSettingsTabs();
-  };
+  afterRender(setupExpenseSettingsTabs);
   render();
 })();
 
@@ -3369,12 +3180,10 @@ if ('serviceWorker' in navigator) {
         renderExpenseFeedback();
       }, 2500);
     };
-  const previousRender = render;
-  render = () => {
-    previousRender();
+  afterRender(() => {
     renderExpenseFeedback();
     if (displayMode) applyDisplayMode();
-  };
+  });
 })();
 
 (() => {
@@ -3504,11 +3313,7 @@ if ('serviceWorker' in navigator) {
     stack.replaceChildren(display, sync, backup, budget);
     refreshSyncPanel();
   };
-  const settingsLayoutRender = render;
-  render = () => {
-    settingsLayoutRender();
-    organizeSettingsPanels();
-  };
+  afterRender(organizeSettingsPanels);
   const settingsUserHandler = onFirebaseUser;
   onFirebaseUser = async user => {
     await settingsUserHandler(user);
@@ -3518,12 +3323,6 @@ if ('serviceWorker' in navigator) {
 })();
 
 (() => {
-  const priorMonth = monthId => {
-    const [year, month] = monthId.split('-').map(Number);
-    const date = new Date(year, month - 2, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
-
   renderIncomeLevels = (message = '') => {
     setupIncomeHistory();
     const host = document.getElementById('incomeHistory');
@@ -3554,7 +3353,7 @@ if ('serviceWorker' in navigator) {
       const current = [...data.settings.incomeLevels].sort((a, b) =>
         String(b.start).localeCompare(String(a.start)),
       )[0];
-      if (current && !current.end) current.end = priorMonth(start);
+      if (current && !current.end) current.end = previousMonthId(start);
       data.settings.incomeLevels.push({
         id: `income-${Date.now()}`,
         start,
@@ -3636,11 +3435,7 @@ if ('serviceWorker' in navigator) {
     insights.classList.toggle('hidden', !messages.length);
   };
 
-  const insightRender = render;
-  render = () => {
-    insightRender();
-    renderInsights();
-  };
+  afterRender(renderInsights);
 
   window.addIncomeLevel = event => {
     event?.preventDefault();
@@ -3652,9 +3447,7 @@ if ('serviceWorker' in navigator) {
     );
     const current = levels[0];
     if (current && !current.end) {
-      const [year, month] = start.split('-').map(Number);
-      const date = new Date(year, month - 2, 1);
-      current.end = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      current.end = previousMonthId(start);
     }
     data.settings.incomeLevels.push({
       id: `income-${Date.now()}`,
@@ -3676,11 +3469,7 @@ if ('serviceWorker' in navigator) {
     button.dataset.incomeLevelBound = 'true';
     button.onclick = window.addIncomeLevel;
   };
-  const incomeButtonRender = render;
-  render = () => {
-    incomeButtonRender();
-    bindIncomeLevelButton();
-  };
+  afterRender(bindIncomeLevelButton);
   render();
 })();
 
@@ -3707,12 +3496,10 @@ if ('serviceWorker' in navigator) {
       ? 'Install Estuary for faster access from your home screen.'
       : 'Chrome will make installation available when this device is eligible.';
   };
-  const baseInstallRender = render;
-  render = () => {
-    baseInstallRender();
+  afterRender(() => {
     placeInstallPanel();
     updateInstallStatus();
-  };
+  });
   window.addEventListener('beforeinstallprompt', () => {
     placeInstallPanel();
     updateInstallStatus();
@@ -3732,11 +3519,6 @@ if ('serviceWorker' in navigator) {
 })();
 
 (() => {
-  const monthBefore = monthId => {
-    const [year, month] = monthId.split('-').map(Number);
-    const date = new Date(year, month - 2, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
   const persistIncomeLevels = () => {
     syncLegacyMonthlyIncome();
     save();
@@ -3782,7 +3564,7 @@ if ('serviceWorker' in navigator) {
     const current = [...data.settings.incomeLevels].sort((a, b) =>
       String(b.start).localeCompare(String(a.start)),
     )[0];
-    if (current && !current.end) current.end = monthBefore(start);
+    if (current && !current.end) current.end = previousMonthId(start);
     data.settings.incomeLevels.push({
       id: `income-${Date.now()}`,
       start,
@@ -3815,16 +3597,6 @@ if ('serviceWorker' in navigator) {
 })();
 
 (() => {
-  const priorIncomeMonth = monthId => {
-    const [year, month] = monthId.split('-').map(Number);
-    const date = new Date(year, month - 2, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
-  const nextIncomeMonth = monthId => {
-    const [year, month] = monthId.split('-').map(Number);
-    const date = new Date(year, month, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
   const formatIncomeMonth = monthId => (monthId ? `${monthId.slice(5)}/${monthId.slice(0, 4)}` : '');
   const parseIncomeMonth = value => {
     const digits = String(value || '').replace(/\D/g, '');
@@ -3845,7 +3617,7 @@ if ('serviceWorker' in navigator) {
       String(b.start).localeCompare(String(a.start)),
     );
     levels.forEach((level, index) => {
-      level.end = index === 0 ? '' : priorIncomeMonth(levels[index - 1].start);
+      level.end = index === 0 ? '' : previousMonthId(levels[index - 1].start);
     });
     return levels;
   };
@@ -3892,7 +3664,7 @@ if ('serviceWorker' in navigator) {
       oldest = levels.at(-1);
     data.settings.incomeLevels.push({
       id: `income-${Date.now()}`,
-      start: priorIncomeMonth(oldest.start),
+      start: previousMonthId(oldest.start),
       end: '',
       paycheck: num(oldest.paycheck),
     });
@@ -4337,9 +4109,7 @@ if ('serviceWorker' in navigator) {
   document.addEventListener('click', event => {
     if (event.target.closest?.('.nav-tab')) requestAnimationFrame(syncHeaderAction);
   });
-  const priorRender = render;
-  render = () => {
-    priorRender();
+  afterRender(() => {
     document.querySelectorAll('[data-notes-month]').forEach(button => {
       const monthId = button.dataset.notesMonth;
       const hasExtraIncome =
@@ -4352,7 +4122,7 @@ if ('serviceWorker' in navigator) {
           : 'Add notes';
     });
     syncHeaderAction();
-  };
+  });
   render();
 })();
 
@@ -4818,13 +4588,11 @@ if ('serviceWorker' in navigator) {
   document.addEventListener('click', event => {
     if (event.target.closest?.('.nav-tab')) requestAnimationFrame(syncHeaderAction);
   });
-  const previousRender = render;
-  render = () => {
-    previousRender();
+  afterRender(() => {
     renderInvestments();
     syncHeaderAction();
     if (displayMode) applyDisplayMode();
-  };
+  });
   renderInvestments();
   syncHeaderAction();
   if (displayMode) applyDisplayMode();
@@ -5160,22 +4928,15 @@ if ('serviceWorker' in navigator) {
       .join('');
     insightHost.classList.toggle('hidden', !selectedInsights.length);
   };
-  const previousRender = render;
-  render = () => {
-    previousRender();
+  afterRender(() => {
     renderRandomInsights();
     if (displayMode) applyDisplayMode();
-  };
+  });
   renderRandomInsights();
   if (displayMode) applyDisplayMode();
 })();
 
 (() => {
-  const previousMonthId = monthId => {
-    const [year, month] = monthId.split('-').map(Number);
-    const date = new Date(year, month - 2, 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
   const updateSavingsLatest = () => {
     const savingsCard = [...document.querySelectorAll('#chartArea .chart-grid .chart-card')].find(
       card => card.querySelector('h3')?.textContent.trim() === 'Savings',
@@ -5202,12 +4963,10 @@ if ('serviceWorker' in navigator) {
       ?.closest('tr')
       ?.classList.add('current-month-row');
   };
-  const previousRender = render;
-  render = () => {
-    previousRender();
+  afterRender(() => {
     highlightCurrentMonth();
     if (displayMode) applyDisplayMode();
-  };
+  });
   highlightCurrentMonth();
 })();
 
@@ -5390,13 +5149,11 @@ if ('serviceWorker' in navigator) {
     },
     true,
   );
-  const previousRender = render;
-  render = () => {
-    previousRender();
+  afterRender(() => {
     renderAccounts();
     syncHeaderAction();
     if (displayMode) applyDisplayMode();
-  };
+  });
   renderAccounts();
   syncHeaderAction();
   if (displayMode) applyDisplayMode();
