@@ -4767,7 +4767,7 @@ const historicTravel = {
   2023: { total: 13000, months: 12 },
   2024: { total: 15300, months: 12 },
   2025: { total: 18000, months: 12 },
-  2026: { total: 15700, months: 9 },
+  2026: { total: 15700, months: 8 },
 };
 function historicalTravelForMonth(monthId) {
   const history = historicTravel[monthId.slice(0, 4)];
