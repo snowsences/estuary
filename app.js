@@ -1031,7 +1031,10 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(monthsRef, snapshot => {
-      if (!snapshot.empty) {
+      // A snapshot that is both empty and only from the local cache means Firestore hasn't heard
+      // back from the server yet for this collection, not that it's actually empty; applying it
+      // would wipe out real data with nothing (see accounts/entries/etc. below for the same guard).
+      if (!(snapshot.empty && snapshot.metadata.fromCache)) {
         const merged = new Map(data.months.map(month => [month.id, month]));
         snapshot.docs.forEach(record => {
           const remote = normalizeMonthRecord(record.data(), record.id);
@@ -1050,6 +1053,9 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(entriesRef, snapshot => {
+      // Skip an empty snapshot that only reflects "nothing cached yet" rather than a confirmed
+      // empty collection, so a slow or briefly offline connection can't wipe real expenses.
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       data.entries = snapshot.docs
         .map(record => normalizeExpenseRecord(record.data(), record.id))
         .filter(Boolean)
@@ -1060,6 +1066,7 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(extraIncomeRef, snapshot => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       data.extraIncome = snapshot.docs
         .map(record => normalizeExtraIncomeRecord(record.data(), record.id))
         .filter(Boolean)
@@ -1070,6 +1077,7 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(investmentsRef, snapshot => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       const migrated = [];
       data.investments = snapshot.docs
         .map(record => {
@@ -1100,7 +1108,7 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(investmentBalancesRef, snapshot => {
-      if (!snapshot.empty)
+      if (!(snapshot.empty && snapshot.metadata.fromCache))
         data.investmentBalances = snapshot.docs
           .map(record => normalizeInvestmentBalanceRecord(record.data(), record.id))
           .filter(Boolean)
@@ -1111,6 +1119,11 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(accountsRef, snapshot => {
+      // Same guard as above: an empty snapshot that's only from the local cache means Firestore
+      // hasn't confirmed this collection's contents with the server yet, not that it's empty.
+      // Without this, a slow connection or brief reconnect right after adding an account could
+      // wipe it from both memory and localStorage before its write was ever seen.
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       data.accounts = snapshot.docs
         .map(record => normalizeAccountRecord(record.data(), record.id))
         .filter(Boolean)
@@ -5335,18 +5348,18 @@ function travelYearTotal(year, throughMonth = '12') {
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg>';
   const cardMarkup = account =>
     `<article class="account-card"><div class="account-card-art">${artwork(account)}<div class="account-card-actions"><button type="button" class="account-card-action" data-edit-account="${account.id}" aria-label="Edit ${escapeHtml(account.name)}" title="Edit">${editIcon}</button><button type="button" class="account-card-action account-delete" data-delete-account="${account.id}" aria-label="Delete ${escapeHtml(account.name)}" title="Delete">${deleteIcon}</button></div></div><div class="account-card-body"><div class="account-card-title"><h4>${escapeHtml(account.name)}</h4></div>${account.use ? `<p class="account-card-use">${escapeHtml(account.use)}</p>` : ''}${account.signupBonus ? `<div class="account-card-copy"><small>Signup bonus</small><p>${escapeHtml(account.signupBonus)}</p></div>` : ''}</div></article>`;
-  const groupMarkup = (kind, label) => {
+  const groupMarkup = (kind, label, showHeading = true) => {
     const matching = data.accounts
         .filter(account => account.kind === kind)
         .sort((a, b) => a.name.localeCompare(b.name)),
       active = matching.filter(account => account.status === 'Active'),
       closed = matching.filter(account => account.status === 'Closed');
-    return `<section class="accounts-group"><div class="accounts-group-head"><h3>${label}</h3><span>${matching.length}</span></div>${active.length ? `<div class="accounts-grid">${active.map(cardMarkup).join('')}</div>` : `<div class="accounts-empty">No active ${label.toLowerCase()} yet.</div>`}${closed.length ? `<details class="accounts-closed"><summary>Closed · ${closed.length}</summary><div class="accounts-grid">${closed.map(cardMarkup).join('')}</div></details>` : ''}</section>`;
+    return `<section class="accounts-group">${showHeading ? `<div class="accounts-group-head"><h3>${label}</h3><span>${matching.length}</span></div>` : ''}${active.length ? `<div class="accounts-grid">${active.map(cardMarkup).join('')}</div>` : `<div class="accounts-empty">No active ${label.toLowerCase()} yet.</div>`}${closed.length ? `<details class="accounts-closed"><summary>Closed · ${closed.length}</summary><div class="accounts-grid">${closed.map(cardMarkup).join('')}</div></details>` : ''}</section>`;
   };
   const renderAccounts = () => {
     if (content)
       content.innerHTML =
-        groupMarkup('Credit Card', 'Credit Cards') + groupMarkup('Bank Account', 'Bank Accounts');
+        groupMarkup('Credit Card', 'Credit Cards', false) + groupMarkup('Bank Account', 'Bank Accounts');
   };
   const syncHeaderAction = () => {
     if (!headerAction) return;

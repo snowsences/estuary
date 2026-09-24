@@ -430,10 +430,12 @@ input {
   cursor: pointer;
 }
 .choice-option.selected {
-  background: var(--orange);
+  /* !important: the theme-scoped `.choice-option` background rules are more specific than this
+     class-only selector and would otherwise win, leaving "selected" chips looking unselected. */
+  background: var(--orange) !important;
   border-color: var(--orange);
-  color: #1c2522;
-  box-shadow: 0 0 0 2px #f0845c55;
+  color: #10272b;
+  box-shadow: 0 0 0 1px var(--orange);
 }
 .dialog-grid .full-row {
   grid-column: 1/-1;
@@ -515,10 +517,6 @@ input {
   background: #e8f0ed;
   color: var(--ink);
 }
-:root[data-theme='light'] .choice-option.selected {
-  background: var(--orange);
-  color: #fff;
-}
 :root[data-theme='light'] .year-timeline button.selected {
   background: #fff4ef;
 }
@@ -536,6 +534,9 @@ input {
 }
 #expenseDialog .dialog-inner > p.small {
   display: none;
+}
+#expenseDialog .dialog-inner > h2 {
+  margin-bottom: 18px;
 }
 body,
 button,
@@ -899,7 +900,7 @@ textarea,
     grid-column: auto !important;
   }
   .option-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
   .modifier-grid {
     grid-template-columns: repeat(3, 1fr);
@@ -1135,18 +1136,13 @@ textarea,
   background: #f7f1e5;
   color: #10272b;
 }
-:root:not([data-theme='light']) .choice-option.selected {
-  color: #10272b;
-  box-shadow: 0 0 0 2px #f0ae3755;
-}
 :root:not([data-theme='light']) .year-timeline button.selected {
   background: #253637;
 }
 :root:not([data-theme='light']) .action-menu {
   background: #173235;
 }
-:root[data-theme='light'] .button.primary,
-:root[data-theme='light'] .choice-option.selected {
+:root[data-theme='light'] .button.primary {
   background: var(--orange);
   border-color: var(--orange);
   color: #10272b;
@@ -1915,9 +1911,6 @@ textarea,
     min-width: 972px;
   }
 }
-.choice-option.selected {
-  color: #fff !important;
-}
 .history-filter {
   margin: 0 0 10px;
   width: min(360px, 100%);
@@ -2558,7 +2551,7 @@ body.auth-locked dialog {
     border-top: 1px solid var(--line);
   }
   #expenseDialog .shopping-suboptions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 .category-bars-chart {
@@ -2832,11 +2825,6 @@ button {
 #expenseEditDialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
-:root[data-theme='light'] #expenseDialog .choice-option.selected,
-:root[data-theme='light'] #expenseEditDialog .choice-option.selected {
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
 @media (max-width: 680px) {
   #expenseEditDialog {
     position: fixed;
@@ -2866,7 +2854,7 @@ button {
     grid-column: 1 / -1 !important;
   }
   #expenseEditDialog .shopping-suboptions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   #expenseEditDialog .dialog-inner > .toolbar.modal-actions {
     position: relative !important;
@@ -3579,20 +3567,6 @@ body:not(.auth-locked) #authGate {
     border-top: 1px solid var(--line);
     background: var(--surface);
   }
-}
-.investment-page-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: flex-end;
-  margin: 0 0 18px;
-}
-.investment-page-heading h2 {
-  font-size: 26px;
-}
-.investment-page-heading p:last-child {
-  margin: 5px 0 0;
-  color: var(--muted);
 }
 .investment-summary {
   display: grid;
