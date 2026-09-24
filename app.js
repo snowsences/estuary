@@ -634,7 +634,9 @@ let firebaseClient = null,
   firebaseUnsubscribers = [],
   clearPrivateDataAfterAuthChange = false,
   firebaseSettingsReady = false,
-  firebaseMonthsReady = false;
+  firebaseMonthsReady = false,
+  firebaseMonthsConfirmed = false,
+  firebaseEntriesConfirmed = false;
 const firebaseStatusMessage = message => {
   const el = document.getElementById('firebaseStatus');
   if (el) el.textContent = message;
@@ -1035,10 +1037,24 @@ function maybeLockSavedMonths() {
   changed.forEach(syncMonth);
   return true;
 }
+function reconcileCurrentMonthGroceriesFromHistory() {
+  if (!firebaseUser || !firebaseMonthsConfirmed || !firebaseEntriesConfirmed) return false;
+  const monthId = currentMonthKey(),
+    month = data.months.find(item => item.id === monthId),
+    entries = data.entries.filter(entry => entry.month === monthId && entry.type === 'Groceries');
+  if (!month || !entries.length) return false;
+  const historyTotal = round(entries.reduce((sum, entry) => sum + num(entry.final), 0));
+  if (Math.abs(num(month.groceries) - historyTotal) < 0.005) return false;
+  month.groceries = historyTotal;
+  syncMonth(month);
+  return true;
+}
 function subscribeFirebase() {
   stopFirebaseListeners();
   firebaseSettingsReady = false;
   firebaseMonthsReady = false;
+  firebaseMonthsConfirmed = false;
+  firebaseEntriesConfirmed = false;
   const settingsRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'settings');
   const financeNotesRef = firebaseClient.doc(firebaseClient.db, ...firebasePath('budget'), 'financeNotes');
   const investmentSettingsRef = firebaseClient.doc(
@@ -1134,7 +1150,9 @@ function subscribeFirebase() {
         ensureYear(currentYear + 1);
       }
       firebaseMonthsReady = true;
+      if (!snapshot.metadata.fromCache) firebaseMonthsConfirmed = true;
       maybeLockSavedMonths();
+      reconcileCurrentMonthGroceriesFromHistory();
       save();
       render();
     }),
@@ -1148,6 +1166,8 @@ function subscribeFirebase() {
         .map(record => normalizeExpenseRecord(record.data(), record.id))
         .filter(Boolean)
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      if (!snapshot.metadata.fromCache) firebaseEntriesConfirmed = true;
+      reconcileCurrentMonthGroceriesFromHistory();
       save();
       render();
     }),
@@ -2913,7 +2933,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 (() => {
   const editDialog = document.getElementById('expenseEditDialog');
   if (!editDialog) return;
-  editDialog.innerHTML = `<form class="dialog-inner" id="expenseEditForm"><button type="button" class="dialog-close" id="closeExpenseEdit" aria-label="Close expense editor">×</button><h2>Edit expense</h2><div class="dialog-grid"><label class="expense-amount-field"><input id="expenseEditAmount" inputmode="decimal" placeholder="0.00" aria-label="Amount" required></label><label class="expense-final-field">Final amount<strong id="expenseEditFinal">$0.00</strong></label><label class="full-row"><div class="option-grid expense-category-options" id="expenseEditCategoryOptions"><button type="button" class="choice-option" data-edit-category="Groceries">Groceries</button><button type="button" class="choice-option" data-edit-category="Dining">Dining</button><button type="button" class="choice-option" data-edit-category="Shopping">Shopping</button><button type="button" class="choice-option" data-edit-category="Bills">Bills</button></div><div class="expense-suboptions hidden" id="expenseEditBillSuboptions"><span>Bill type</span><div class="option-grid"><button type="button" class="choice-option" data-edit-bill="Water">Water</button><button type="button" class="choice-option" data-edit-bill="Electricity">Electricity</button><button type="button" class="choice-option" data-edit-bill="Gas">Gas</button></div></div><div class="expense-suboptions" id="expenseEditShoppingSuboptions"><div class="option-grid shopping-suboptions"><button type="button" class="choice-option" data-edit-shopping="Entertainment">Entertainment</button><button type="button" class="choice-option" data-edit-shopping="Travel">Travel</button><button type="button" class="choice-option" data-edit-shopping="Health">Health</button><button type="button" class="choice-option" data-edit-shopping="Pets">Pets</button><button type="button" class="choice-option" data-edit-shopping="Misc">Misc</button></div></div><input id="expenseEditType" type="hidden"></label><label class="full-row"><span>CC modifier</span><div class="option-grid modifier-grid" id="expenseEditModifierOptions"><button type="button" class="choice-option" data-edit-modifier="0.94">94%</button><button type="button" class="choice-option" data-edit-modifier="0.95">95%</button><button type="button" class="choice-option" data-edit-modifier="0.97">97%</button><button type="button" class="choice-option" data-edit-modifier="0.98">98%</button><button type="button" class="choice-option" data-edit-modifier="0.99">99%</button><button type="button" class="choice-option" data-edit-modifier="1">100%</button></div><input id="expenseEditModifier" type="hidden"></label><label><select id="expenseEditMonth" aria-label="Month"></select></label><label class="full-row" id="expenseEditCommentField"><textarea id="expenseEditComment" maxlength="500" placeholder="What was this for?"></textarea></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelExpenseEdit">Cancel</button><button type="submit" class="button primary">Edit expense</button></div></form>`;
+  editDialog.innerHTML = `<form class="dialog-inner" id="expenseEditForm"><button type="button" class="dialog-close" id="closeExpenseEdit" aria-label="Close expense editor">×</button><h2>Edit expense</h2><div class="dialog-grid"><label class="expense-amount-field"><input id="expenseEditAmount" inputmode="decimal" placeholder="0.00" aria-label="Amount" required></label><label class="expense-final-field">Final amount<strong id="expenseEditFinal">$0.00</strong></label><label class="full-row"><div class="option-grid expense-category-options" id="expenseEditCategoryOptions"><button type="button" class="choice-option" data-edit-category="Groceries">Groceries</button><button type="button" class="choice-option" data-edit-category="Dining">Dining</button><button type="button" class="choice-option" data-edit-category="Shopping">Shopping</button><button type="button" class="choice-option" data-edit-category="Bills">Bills</button></div><div class="expense-suboptions hidden" id="expenseEditBillSuboptions"><span>Bill type</span><div class="option-grid"><button type="button" class="choice-option" data-edit-bill="Water">Water</button><button type="button" class="choice-option" data-edit-bill="Electricity">Electricity</button><button type="button" class="choice-option" data-edit-bill="Gas">Gas</button></div></div><div class="expense-suboptions" id="expenseEditShoppingSuboptions"><div class="option-grid shopping-suboptions"><button type="button" class="choice-option" data-edit-shopping="Entertainment">Entertainment</button><button type="button" class="choice-option" data-edit-shopping="Travel">Travel</button><button type="button" class="choice-option" data-edit-shopping="Health">Health</button><button type="button" class="choice-option" data-edit-shopping="Pets">Pets</button><button type="button" class="choice-option" data-edit-shopping="Misc">Misc</button></div></div><input id="expenseEditType" type="hidden"></label><label class="full-row"><span>CC modifier</span><div class="option-grid modifier-grid" id="expenseEditModifierOptions"><button type="button" class="choice-option" data-edit-modifier="0.94">94%</button><button type="button" class="choice-option" data-edit-modifier="0.95">95%</button><button type="button" class="choice-option" data-edit-modifier="0.97">97%</button><button type="button" class="choice-option" data-edit-modifier="0.98">98%</button><button type="button" class="choice-option" data-edit-modifier="0.99">99%</button><button type="button" class="choice-option" data-edit-modifier="1">100%</button></div><input id="expenseEditModifier" type="hidden"></label><label class="full-row expense-edit-month-field"><select id="expenseEditMonth" aria-label="Month"></select></label><label class="full-row" id="expenseEditCommentField"><textarea id="expenseEditComment" maxlength="500" placeholder="What was this for?"></textarea></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelExpenseEdit">Cancel</button><button type="submit" class="button primary">Edit expense</button></div></form>`;
 
   const form = document.getElementById('expenseEditForm');
   const amount = document.getElementById('expenseEditAmount');

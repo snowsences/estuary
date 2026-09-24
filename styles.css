@@ -5017,3 +5017,17 @@ dialog .dialog-inner,
 #investments .history-entry b {
   font-size: 14px !important;
 }
+
+/* Edit Expense field parity with Add Expense. */
+:root:not([data-theme='light']) #expenseEditDialog #expenseEditAmount,
+:root:not([data-theme='light']) #expenseEditDialog #expenseEditAmount:focus,
+:root:not([data-theme='light']) #expenseEditDialog #expenseEditAmount:focus-visible {
+  border: 1px solid var(--line) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+#expenseEditDialog .expense-edit-month-field,
+#expenseEditDialog #expenseEditMonth {
+  width: 100% !important;
+  min-width: 0;
+}
