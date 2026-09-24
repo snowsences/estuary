@@ -4622,7 +4622,12 @@ body:not(.auth-locked) #authGate {
     box-shadow:
       0 1px 3px rgba(0, 0, 0, 0.3),
       0 4px 8px 3px rgba(0, 0, 0, 0.15);
-    transition: box-shadow 0.15s ease;
+    transition:
+      box-shadow 0.15s ease,
+      transform 0.15s ease;
+  }
+  .header-actions #addExpense:active {
+    transform: scale(0.94);
   }
   /* 24px plus icon drawn with two bars, in the button's label colour */
   .header-actions #addExpense::before {
@@ -4657,5 +4662,260 @@ body:not(.auth-locked) #authGate {
     box-shadow:
       0 2px 3px rgba(0, 0, 0, 0.3),
       0 6px 10px 4px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* ---------- Motion and native feel ----------
+   Durations: 150ms for small feedback, 250–300ms for dialogs and tab changes, 400–800ms for charts.
+   Easing follows Material: standard for small changes, decelerate for things arriving,
+   accelerate for things leaving. Everything that moves sits inside prefers-reduced-motion. */
+:root {
+  --motion-short: 150ms;
+  --motion-medium: 250ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --tab-shift: 24px;
+}
+:root[data-tab-direction='back'] {
+  --tab-shift: -24px;
+}
+@property --donut-sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 360deg;
+}
+
+/* No grey tap flash or accidental text selection on controls; scrolling stays inside dialogs and scrollers. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+summary,
+.button,
+.nav-tab,
+.choice-option,
+[role='tab'] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+dialog,
+dialog .dialog-inner,
+.table-wrap,
+.year-timeline {
+  overscroll-behavior: contain;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  /* Press feedback and smooth state changes on controls */
+  button,
+  .button,
+  .choice-option,
+  summary,
+  .nav-tab {
+    transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+    transition-duration: var(--motion-short);
+    transition-timing-function: var(--ease-standard);
+  }
+  :is(button, .button, .choice-option):active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Dialogs rise and fade in; closing reverses faster. The backdrop fades with them. */
+  dialog {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+    transition:
+      opacity 200ms var(--ease-accelerate),
+      transform 200ms var(--ease-accelerate),
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
+  }
+  dialog[open] {
+    opacity: 1;
+    transform: none;
+    transition-duration: 300ms;
+    transition-timing-function: var(--ease-decelerate);
+  }
+  @starting-style {
+    dialog[open] {
+      opacity: 0;
+      transform: translateY(16px) scale(0.98);
+    }
+  }
+  dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity 200ms linear,
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
+  }
+  dialog[open]::backdrop {
+    opacity: 1;
+    transition-duration: 300ms;
+  }
+  @starting-style {
+    dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+  @media (max-width: 680px) {
+    dialog {
+      transform: translateY(48px);
+    }
+    @starting-style {
+      dialog[open] {
+        transform: translateY(48px);
+      }
+    }
+    /* The full-screen Add expense dialog slides up from the bottom edge. */
+    #expenseDialog {
+      opacity: 1;
+      transform: translateY(100%);
+    }
+    #expenseDialog[open] {
+      transform: none;
+    }
+    @starting-style {
+      #expenseDialog[open] {
+        opacity: 1;
+        transform: translateY(100%);
+      }
+    }
+  }
+
+  /* Tab changes: content slides toward the direction of travel (View Transitions where supported).
+     The nav is excluded so its indicator can slide on its own. */
+  .main-nav {
+    view-transition-name: main-nav;
+  }
+  .header-actions {
+    view-transition-name: header-action;
+  }
+  .brand-mark {
+    view-transition-name: brand;
+  }
+  ::view-transition-old(main-nav) {
+    display: none;
+  }
+  ::view-transition-new(main-nav) {
+    animation: none;
+  }
+  ::view-transition-old(root) {
+    animation: tab-out 120ms var(--ease-accelerate) both;
+  }
+  ::view-transition-new(root) {
+    animation: tab-in var(--motion-medium) var(--ease-decelerate) 60ms both;
+  }
+  @keyframes tab-out {
+    to {
+      opacity: 0;
+      transform: translateX(calc(var(--tab-shift) * -1));
+    }
+  }
+  @keyframes tab-in {
+    from {
+      opacity: 0;
+      transform: translateX(var(--tab-shift));
+    }
+  }
+
+  /* Rows and cells that were just added or edited glow briefly. */
+  [data-changed] {
+    animation: changed-glow 1.5s var(--ease-standard) var(--changed-delay, 0ms) both;
+  }
+  td[data-changed] .utility-input {
+    animation: changed-glow 1.5s var(--ease-standard) var(--changed-delay, 0ms) both;
+  }
+  @keyframes changed-glow {
+    from {
+      background-color: color-mix(in srgb, var(--good) 26%, transparent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 55%, transparent);
+    }
+  }
+
+  /* Newly revealed History months fade up. */
+  .history-group-enter {
+    animation: fade-up var(--motion-medium) var(--ease-decelerate) both;
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  /* Opening a tab or changing a chart's range: lines draw in, fills and dots fade, rings sweep, bars fill. */
+  .animate-in .chart-line {
+    stroke-dasharray: 1;
+    animation: chart-draw 700ms var(--ease-decelerate) both;
+  }
+  .animate-in :is(.chart-svg, .investment-chart svg) :is(circle, rect, path[fill^='url']) {
+    animation: fade-in 500ms var(--ease-standard) 250ms both;
+  }
+  .animate-in .investment-donut {
+    -webkit-mask: conic-gradient(#000 var(--donut-sweep), transparent 0);
+    mask: conic-gradient(#000 var(--donut-sweep), transparent 0);
+    animation: donut-sweep 800ms var(--ease-decelerate) both;
+  }
+  .animate-in .investment-progress i {
+    transform-origin: left;
+    animation: bar-fill 700ms var(--ease-decelerate) 100ms both;
+  }
+  @keyframes chart-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes donut-sweep {
+    from {
+      --donut-sweep: 0deg;
+    }
+    to {
+      --donut-sweep: 360deg;
+    }
+  }
+  @keyframes bar-fill {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  /* Disclosure panels (contribution history, closed accounts, settings) open smoothly. */
+  details::details-content {
+    block-size: 0;
+    overflow-y: clip;
+    transition:
+      block-size var(--motion-medium) var(--ease-standard),
+      content-visibility var(--motion-medium) allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+  }
+
+  /* Phones: the add button slides away while scrolling down. */
+  @media (max-width: 680px) {
+    .header-actions {
+      transition:
+        transform var(--motion-medium) var(--ease-standard),
+        opacity var(--motion-medium) var(--ease-standard);
+    }
+    .header-actions.fab-hidden {
+      transform: translateY(24px) scale(0.6);
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 }
