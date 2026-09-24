@@ -4917,3 +4917,12 @@ dialog .dialog-inner,
     white-space: nowrap;
   }
 }
+
+/* Keep the auto-focused Add Expense amount field consistent with the other fields. */
+:root:not([data-theme='light']) #expenseDialog #expenseAmount,
+:root:not([data-theme='light']) #expenseDialog #expenseAmount:focus,
+:root:not([data-theme='light']) #expenseDialog #expenseAmount:focus-visible {
+  border: 1px solid var(--line) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
