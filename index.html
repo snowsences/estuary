@@ -1,733 +1,423 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'self' https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com wss://*.googleapis.com https://apis.google.com https://accounts.google.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; form-action 'self'; manifest-src 'self'; upgrade-insecure-requests">
-  <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#0a1e20"><meta name="application-name" content="Estuary"><meta name="apple-mobile-web-app-title" content="Estuary"><link rel="manifest" href="manifest.webmanifest?v=estuary-10"><link rel="icon" href="app-icon.png?v=10" type="image/png"><link rel="apple-touch-icon" href="app-icon.png?v=10"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <title>Estuary</title>
-  <meta name="estuary-release" content="111">
-  <style>
-    :root{--ink:#163b35;--bg:#f5f7f6;--line:#dbe5e1;--orange:#d96f49;--violet:#79598e;--green:#16816d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#142724;font:15px/1.4 Arial,sans-serif}.app{max-width:1240px;margin:auto;padding:36px 24px 64px}header{display:flex;justify-content:space-between;gap:20px;align-items:center}h1,h2{letter-spacing:-.045em}h1{font-size:clamp(30px,5vw,46px);margin:0}h2{margin:0;font-size:21px}.eyebrow{font-size:11px;font-weight:bold;letter-spacing:.13em;color:#66827a;margin:0 0 5px}.button{border:0;background:var(--ink);color:#fff;font:inherit;font-weight:bold;padding:11px 15px;border-radius:9px;cursor:pointer}.button.primary{background:var(--orange);font-size:16px;padding:14px 19px}.button.ghost{background:#e8f0ed;color:var(--ink)}.notice{margin:17px 0 25px;color:#60746f;font-size:13px}.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:22px}.tab{border:0;background:none;padding:0 1px 11px;color:#66827a;font:inherit;font-weight:bold;cursor:pointer}.tab.active{color:var(--ink);border-bottom:3px solid var(--orange)}.hidden{display:none!important}.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px}.toolbar select,select,input{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font:inherit;color:inherit}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.metric,.panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:19px}.metric{border-top:4px solid var(--ink)}.metric.orange{border-top-color:var(--orange)}.metric.green{border-top-color:var(--green)}.metric.violet{border-top-color:var(--violet)}.metric p,.metric span{margin:0;color:#657c75;font-size:12px}.metric strong{display:block;font-size:25px;letter-spacing:-.05em;margin:6px 0}.grid{display:grid;grid-template-columns:1.05fr .95fr;gap:15px;margin-top:15px}.breakdown{display:flex;justify-content:space-between;border-bottom:1px solid #e4ece9;padding:11px 0}.breakdown:last-child{border:0}.breakdown b{font-size:14px}.year-note{margin-top:14px;padding:11px;background:#edf5f2;border-radius:8px;color:#54716a;font-size:12px}.entries{margin-top:12px}.entry{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #e4ece9}.entry small{display:block;color:#71867f}.table-wrap{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px}.table{border-collapse:collapse;min-width:980px;width:100%;font-size:13px}.table th,.table td{padding:10px;border-bottom:1px solid #e4ece9;text-align:right}.table th:first-child{text-align:left}.table thead{background:#edf3f1;color:#56706a}.table input{width:85px;padding:5px;text-align:right;border-color:#dce6e2}.megan{color:#765190;font-weight:bold}.saved{color:var(--green);font-weight:bold}.settings{max-width:620px}.settings label,.dialog-grid label{display:grid;gap:5px;margin-top:13px;font-size:13px;font-weight:bold}.settings input{width:100%}.small{color:#657c75;font-size:12px}dialog{border:0;border-radius:16px;padding:0;max-width:510px;width:calc(100% - 28px);box-shadow:0 18px 50px #0004}dialog::backdrop{background:#183c3688}.dialog-inner{padding:24px}.dialog-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.dialog-grid label:first-child{grid-column:1/-1}.dialog-grid input,.dialog-grid select{width:100%}.final{display:flex;justify-content:space-between;border-block:1px solid var(--line);padding:14px 0;margin:18px 0}@media(max-width:780px){.metrics{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}@media(max-width:450px){.app{padding:24px 14px}.dialog-grid{grid-template-columns:1fr}.dialog-grid label:first-child{grid-column:auto}}
-    :root{--bg:#101817;--ink:#eef6f2;--line:#30423d;--surface:#182421;--muted:#9bb0aa;--soft:#21322e;--orange:#f0845c;--violet:#b591d0;--green:#55bba4}body{color:var(--ink);font-family:'Figtree',Arial,sans-serif;font-size:15px}.metric,.panel,.table-wrap{background:var(--surface)}.toolbar select,select,input{background:#13201d;color:var(--ink)}.button{background:#dfece6;color:#10211d}.button.ghost{background:var(--soft);color:var(--ink)}.notice,.metric p,.metric span,.small,.eyebrow,.tab{color:var(--muted);font-size:14px}.table thead,.year-note{background:var(--soft);color:var(--muted)}.breakdown,.entry,.table th,.table td{border-color:var(--line)}.entry small{color:var(--muted);font-size:14px}.table,.table input{font-size:14px}.table input{border-color:var(--line)}.theme-toggle{margin-left:auto}.actions{position:relative}.actions details{display:inline-block;position:relative}.actions summary{cursor:pointer;list-style:none;font-size:18px;letter-spacing:2px;color:var(--muted);padding:0 4px}.actions summary::-webkit-details-marker{display:none}.action-menu{position:absolute;right:0;top:25px;z-index:4;background:#243530;border:1px solid var(--line);border-radius:8px;padding:5px;white-space:nowrap;box-shadow:0 10px 22px #0005}.action-menu button{border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;cursor:pointer;padding:7px 8px}.action-menu button:hover{background:#314842;border-radius:5px}.option-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.modifier-grid{grid-template-columns:repeat(4,1fr)}.choice-option{border:1px solid var(--line);border-radius:8px;background:#13201d;color:var(--muted);font:inherit;font-size:14px;font-weight:700;padding:9px 4px;cursor:pointer}.choice-option.selected{background:var(--orange);border-color:var(--orange);color:#1c2522;box-shadow:0 0 0 2px #f0845c55}.dialog-grid .full-row{grid-column:1/-1}.dialog-grid textarea{resize:vertical;min-height:76px;border:1px solid var(--line);background:#13201d;color:var(--ink);border-radius:8px;padding:9px;font:inherit;font-size:14px}.year-timeline{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 14px;margin-bottom:14px}.year-timeline button{flex:0 0 148px;text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:11px;padding:11px 13px;cursor:pointer;font:inherit}.year-timeline button.selected{border-color:var(--orange);background:#2a2923;box-shadow:inset 0 0 0 1px var(--orange)}.year-timeline strong,.year-timeline span{display:block}.year-timeline strong{font-size:18px}.year-timeline span{font-size:14px;color:var(--muted);margin-top:3px}.year-table{border:1px solid var(--line);border-radius:14px;overflow:hidden}:root[data-theme="light"]{--bg:#f5f7f6;--ink:#163b35;--line:#dbe5e1;--surface:#fff;--muted:#657c75;--soft:#edf5f2;--orange:#d96f49;--violet:#79598e;--green:#16816d}:root[data-theme="light"] .toolbar select,:root[data-theme="light"] select,:root[data-theme="light"] input,:root[data-theme="light"] .choice-option,:root[data-theme="light"] .dialog-grid textarea{background:#fff}:root[data-theme="light"] .button{background:var(--ink);color:#fff}:root[data-theme="light"] .button.ghost{background:#e8f0ed;color:var(--ink)}:root[data-theme="light"] .choice-option.selected{background:var(--orange);color:#fff}:root[data-theme="light"] .year-timeline button.selected{background:#fff4ef}:root[data-theme="light"] .table thead,:root[data-theme="light"] .year-note{background:#edf3f1;color:#56706a}:root[data-theme="light"] .action-menu{background:#fff;box-shadow:0 10px 22px #0002}:root[data-theme="light"] .action-menu button:hover{background:#edf5f2}
-  </style>
-  <style>#expenseDialog .dialog-inner>p.small{display:none}
-  body,button,input,select,textarea,.notice,.metric p,.metric span,.small,.eyebrow,.tab,.table,.table input,.entry small{font-size:16px!important}.top-header{display:flex;align-items:center;gap:28px;padding:0 0 18px;border-bottom:1px solid var(--line)}.top-header h1{white-space:nowrap}.main-nav{display:flex;align-self:stretch;align-items:stretch;gap:4px;flex:1}.nav-tab{position:relative;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:800;padding:0 14px;cursor:pointer;display:flex;align-items:center;gap:9px}.nav-tab .nav-icon{font-size:20px}.nav-tab.active{color:var(--orange)}.nav-tab.active:after{content:'';position:absolute;left:12px;right:12px;bottom:-20px;height:3px;background:var(--orange)}.header-actions{display:flex;min-width:0;gap:9px;align-items:center;margin-left:auto}.header-actions #addExpense{flex:0 1 auto;min-width:0;max-width:100%;height:48px;min-height:48px;max-height:48px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.2}.theme-toggle{margin:0}@media(max-width:680px){.app{padding-bottom:118px}.top-header{padding-bottom:18px}.top-header h1{font-size:29px}.main-nav{position:fixed;z-index:20;left:50%;bottom:12px;transform:translateX(-50%);width:min(calc(100% - 28px),560px);height:78px;border:1px solid var(--line);background:#142522;border-radius:22px;box-shadow:0 12px 30px #0007;display:grid;grid-template-columns:repeat(3,1fr);padding:5px}.nav-tab{padding:7px 4px;flex-direction:column;justify-content:center;gap:2px;font-size:16px!important;border-radius:16px}.nav-tab .nav-icon{font-size:22px;line-height:1}.nav-tab.active:after{display:none}.nav-tab.active{background:#213b35;color:var(--orange)}.header-actions .theme-toggle{display:none}:root[data-theme="light"] .main-nav{background:#fff;box-shadow:0 12px 30px #0003}:root[data-theme="light"] .nav-tab.active{background:#fff4ef}}</style>
-<style>
-  .top-header{gap:22px!important;padding-bottom:10px!important}.top-header h1{font-size:clamp(20px,2vw,30px)!important}.main-nav{gap:2px!important}.main-nav .nav-tab{border:0!important;border-bottom:0!important;padding:0 12px!important;gap:8px!important}.main-nav .nav-tab.active{border-bottom:0!important}.main-nav .nav-tab.active:after{bottom:-12px!important}.table th,.table td{padding:8px 8px 8px 0!important;text-align:right!important}.table th:first-child{padding-left:8px!important;text-align:right!important}.table input{width:68px!important}.table th:nth-child(2),.table td:nth-child(2),.table th:nth-child(3),.table td:nth-child(3),.table th:nth-child(4),.table td:nth-child(4){width:76px}.table th:nth-child(6),.table td:nth-child(6){width:96px}.table td:nth-child(6) input{width:88px!important}
-  @media(max-width:680px){.top-header{padding-bottom:10px!important}.top-header h1{font-size:22px!important}.main-nav .nav-tab{padding:7px 4px!important}}
-</style>
-<style>
-  .table th:first-child{width:1%!important;white-space:nowrap;text-align:left!important;padding-left:8px!important}.charts{margin-top:24px}.chart-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}.chart-controls h2{margin:0}.chart-tabs{display:flex;gap:6px}.chart-tabs button,.bill-tabs button{border:1px solid var(--line);background:var(--surface);color:var(--muted);font:inherit;font-size:16px;padding:7px 11px;border-radius:8px;cursor:pointer}.chart-tabs button.selected,.bill-tabs button.selected{background:var(--orange);border-color:var(--orange);color:#19231f;font-weight:800}.chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.chart-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:18px;min-height:240px}.chart-card-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.chart-card h3{margin:0;font-size:20px}.bill-tabs{display:flex;gap:4px}.bill-tabs button{font-size:16px;padding:5px 7px}.chart-value{color:var(--muted);font-size:16px;margin:5px 0 7px}.chart-svg{display:block;width:100%;height:160px}.chart-empty{height:160px;display:grid;place-items:center;color:var(--muted);font-size:16px}#expenseDialog{background:var(--surface);color:var(--ink);width:min(560px,calc(100vw - 32px));max-width:560px}#expenseDialog label{color:var(--ink)}#expenseDialog .dialog-inner{padding:24px}#expenseDialog .dialog-grid{width:100%}#expenseDialog select,#expenseDialog input,#expenseDialog textarea{max-width:100%;box-sizing:border-box}@media(max-width:680px){.chart-controls{align-items:flex-start;flex-direction:column}.chart-grid{grid-template-columns:1fr}.chart-card{min-height:220px}.chart-card-head{align-items:flex-start;flex-direction:column}.bill-tabs{flex-wrap:wrap}#expenseDialog{position:fixed;inset:0;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border-radius:0;padding:0}#expenseDialog .dialog-inner{height:100dvh;overflow-y:auto;padding:22px 16px 108px}#expenseDialog .dialog-inner>.toolbar:last-child{position:sticky;bottom:-22px;z-index:2;background:var(--surface);border-top:1px solid var(--line);padding:14px 16px;margin:22px -16px -22px;justify-content:stretch!important}#expenseDialog .dialog-inner>.toolbar:last-child button{flex:1}.dialog-grid{grid-template-columns:1fr!important}.dialog-grid label:first-child{grid-column:auto!important}.option-grid{grid-template-columns:repeat(2,1fr)}.modifier-grid{grid-template-columns:repeat(3,1fr)}}
-</style>
-<style>
-  .history-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin:2px 0 14px}.history-head h2{margin:0}.history-head span{color:var(--muted);font-size:16px}.history-list{display:grid;gap:10px}.history-entry{display:grid;grid-template-columns:minmax(150px,1fr) minmax(130px,.8fr) minmax(170px,1fr) minmax(150px,.8fr);gap:16px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}.history-entry span{display:grid;gap:3px}.history-entry small{color:var(--muted);font-size:16px}.history-entry b{font-size:17px}.history-entry .history-comment{grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px;color:var(--muted)}.settings textarea{width:100%;min-height:142px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:10px;background:#13201d;color:var(--ink);font:14px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace}@media(max-width:680px){.main-nav{grid-template-columns:repeat(4,1fr)!important}.history-entry{grid-template-columns:1fr 1fr;gap:12px;padding:14px}.history-entry .history-comment{grid-column:1/-1}.history-entry b{font-size:16px}:root[data-theme="light"] .settings textarea{background:#fff}}
-</style>
-<style>
-  .chart-card{position:relative}.chart-subtitle{color:var(--muted);font-size:14px;margin:3px 0 0}.chart-svg{overflow:visible}.chart-axis-label{fill:var(--muted);font:12px 'Figtree',sans-serif}.chart-grid-line{stroke:currentColor;opacity:.13}.chart-axis{stroke:currentColor;opacity:.35}.chart-point{cursor:crosshair}.modal-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:10px!important;margin:0!important}.modal-actions .button{width:100%;justify-content:center}.dialog-inner{position:relative}.dialog-close{position:absolute;top:14px;right:14px;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--muted);font:32px/32px Arial,sans-serif;cursor:pointer}.dialog-close:hover{background:var(--soft);color:var(--ink)}#expenseDialog h2{padding-right:42px}@media(max-width:680px){.app{padding-bottom:94px!important}.main-nav{left:0!important;right:0!important;bottom:0!important;transform:none!important;width:100%!important;height:70px!important;border-width:1px 0 0!important;border-radius:0!important;padding:4px 2px!important;box-shadow:0 -7px 22px #0005!important}.main-nav .nav-tab{border-radius:0!important}.main-nav .nav-tab.active{background:transparent!important;color:var(--orange)!important}.main-nav .nav-tab.active:before{content:'';position:absolute;top:0;left:22%;right:22%;height:3px;background:var(--orange)}#expenseDialog .dialog-inner>.toolbar.modal-actions{display:grid!important;grid-template-columns:1fr 1fr!important;align-items:stretch}.dialog-close{top:12px;right:10px}}
-</style>
-<style>
-  :root{--bg:#0a1e20;--ink:#f7f1e5;--line:#335357;--surface:#10282a;--muted:#b2bab3;--soft:#19373a;--orange:#f0ae37;--violet:#67a8bf;--green:#40b9af}
-  :root[data-theme="light"]{--bg:#eef5f3;--ink:#10393e;--line:#c8d9d7;--surface:#fffdf8;--muted:#5d7575;--soft:#e2efed;--orange:#dda12b;--violet:#3b7995;--green:#168f8b}
-  :root,:root[data-theme="light"]{--orange:#efa800}
-  :root:not([data-theme="light"]) body{background:var(--bg);color:var(--ink)}
-  :root:not([data-theme="light"]) .main-nav{background:#0e292c}
-  :root:not([data-theme="light"]) .toolbar select,:root:not([data-theme="light"]) select,:root:not([data-theme="light"]) input,:root:not([data-theme="light"]) .choice-option,:root:not([data-theme="light"]) .dialog-grid textarea{background:#0d2225}
-  :root:not([data-theme="light"]) .button{background:#f7f1e5;color:#10272b}
-  :root:not([data-theme="light"]) .choice-option.selected{color:#10272b;box-shadow:0 0 0 2px #f0ae3755}
-  :root:not([data-theme="light"]) .year-timeline button.selected{background:#253637}
-  :root:not([data-theme="light"]) .action-menu{background:#173235}
-  :root[data-theme="light"] .button.primary,:root[data-theme="light"] .choice-option.selected{background:var(--orange);border-color:var(--orange);color:#10272b}
-</style>
-<style>
-  .todo-head{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px}.todo-head h2{margin:0}.todo-form{display:grid;grid-template-columns:minmax(0,1fr) 154px 130px;gap:10px;align-items:start;margin-bottom:26px}.todo-form textarea,.todo-form input{width:100%;margin:0}.todo-form textarea{height:50px;min-height:50px;max-height:250px;resize:none;overflow:hidden;padding:13px 15px;border:1px solid var(--line);border-radius:14px;background:var(--soft);color:var(--ink);line-height:22px}.todo-form textarea::placeholder{color:var(--muted)}.todo-form textarea:focus,.todo-form input:focus{border-color:var(--orange);outline:3px solid color-mix(in srgb,var(--orange) 22%,transparent)}.todo-form input{height:50px;border-radius:14px;background:var(--soft);color-scheme:dark}.todo-form .button{height:50px;white-space:nowrap;border-radius:14px}.todo-list{display:grid;gap:24px}.todo-group h2{font-size:20px;margin:0 0 10px}.todo-group .todo-stack{display:grid;gap:10px}.todo-done{border:0}.todo-done summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none}.todo-done summary::-webkit-details-marker{display:none}.todo-done summary:after{content:'⌄';color:var(--muted);font-size:22px;line-height:1;transform:rotate(-90deg);transition:transform .16s}.todo-done[open] summary:after{transform:rotate(0)}.todo-done[open] summary{margin-bottom:10px}.todo-card{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:center;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.todo-check{position:relative;display:grid;place-items:center;width:42px;height:42px;cursor:pointer}.todo-check input{position:absolute;opacity:0;width:1px;height:1px}.todo-check span{display:grid;place-items:center;width:38px;height:38px;border:2px solid var(--muted);border-radius:10px;color:transparent;font-size:25px;font-weight:800;transition:.16s ease}.todo-check input:focus-visible+span{outline:3px solid var(--orange);outline-offset:3px}.todo-check input:checked+span{border-color:var(--green);background:var(--green);color:#092427}.todo-copy{min-width:0}.todo-copy p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.todo-copy time{display:block;margin-top:5px;color:var(--muted);font-size:14px}.todo-card.done .todo-copy{opacity:.58}.todo-card.done .todo-copy p{text-decoration:line-through}.spending-cell{display:flex;align-items:center;justify-content:flex-end;gap:6px}.notes-button{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;padding:0;border:1px solid var(--line);border-radius:7px;background:var(--soft);color:var(--muted);font:17px/1 Arial,sans-serif;cursor:pointer}.notes-button.has-notes{color:var(--orange);border-color:var(--orange)}.notes-button:hover,.notes-button:focus-visible{color:var(--ink);border-color:var(--orange);outline:none}.notes-dialog{background:var(--surface);color:var(--ink);width:min(520px,calc(100vw - 32px));border:0;border-radius:16px;padding:0;box-shadow:0 18px 50px #0005}.notes-dialog .dialog-inner{padding:24px}.notes-dialog textarea{display:block;width:100%;min-height:180px;resize:vertical;border:1px solid var(--line);border-radius:9px;background:#0d2225;color:var(--ink);padding:10px;font:inherit}.notes-dialog .notes-meta{display:flex;justify-content:flex-end;color:var(--muted);font-size:14px;margin:7px 0 18px}.notes-dialog .toolbar{justify-content:flex-end;margin:0}.notes-dialog h2{padding-right:42px}.notes-dialog .dialog-close{position:absolute;top:14px;right:14px}.notes-dialog::backdrop,#expenseDialog::backdrop{background:rgba(0,0,0,.5)}.chart-tooltip{position:fixed;z-index:50;pointer-events:none;max-width:220px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 10px 24px #0005;font-size:14px;line-height:1.35;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}.chart-tooltip.visible{opacity:1;transform:translateY(0)}.chart-tooltip b,.chart-tooltip span{display:block}.chart-tooltip span{color:var(--muted)}.button.primary{background:var(--orange)!important;border-color:var(--orange)!important;color:#10272b!important}.main-nav{background:transparent!important;box-shadow:none!important}.main-nav .nav-tab.active{background:transparent!important}@media(max-width:680px){.main-nav{grid-template-columns:repeat(4,1fr)!important;border-color:transparent!important}.main-nav .nav-tab{font-size:13px!important}.todo-form{grid-template-columns:minmax(0,1fr) 126px}.todo-form .button{grid-column:1/-1}.todo-card{padding:13px 12px}.notes-dialog{width:calc(100vw - 24px)}.notes-dialog .dialog-inner{padding:20px 16px}.notes-dialog .dialog-close{top:12px;right:10px}:root[data-theme="light"] .todo-form input{color-scheme:light}}
-</style>
-<style>
-  @media(max-width:680px){.app{padding-bottom:150px!important}.top-header{display:block!important;min-height:0!important;padding:0!important;border:0!important}.top-header>div:first-child{display:none!important}.header-actions{position:fixed;z-index:19;left:0;right:0;bottom:70px;display:block!important;margin:0!important;padding:8px 12px!important;background:var(--bg);border-top:1px solid var(--line)}.header-actions #addExpense{display:block;width:100%;height:48px;padding:0!important}.main-nav{z-index:20!important}}
-</style>
-<style>
-  .display-mode-control{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}.display-mode-control span{display:grid;gap:2px}.display-mode-control b{font-size:16px}.display-mode-control small{color:var(--muted);font-size:14px}.display-switch{position:relative;display:inline-flex;width:52px;height:32px;flex:0 0 auto;cursor:pointer}.display-switch input{position:absolute;opacity:0}.display-switch i{display:block;width:100%;height:100%;border:1px solid var(--line);border-radius:999px;background:var(--soft);transition:.18s}.display-switch i:after{content:'';position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:.18s}.display-switch input:checked+i{background:var(--orange);border-color:var(--orange)}.display-switch input:checked+i:after{transform:translateX(20px);background:#10272b}.display-switch input:focus-visible+i{outline:3px solid color-mix(in srgb,var(--orange) 28%,transparent);outline-offset:3px}.display-mode input[type="text"]{cursor:not-allowed}.install-banner{position:fixed;z-index:40;top:12px;left:50%;transform:translateX(-50%);width:min(calc(100% - 24px),520px);display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 10px 10px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:0 12px 28px #0005}.install-banner span{font-weight:700}.install-banner>div{display:flex;align-items:center;gap:7px}.install-banner .button{padding:9px 14px}.install-dismiss{width:34px;height:34px;border:0;border-radius:50%;background:transparent;color:var(--muted);font:28px/1 Arial,sans-serif;cursor:pointer}.install-dismiss:hover{background:var(--soft);color:var(--ink)}.app>section:not(#settings){margin-top:12px}.main-nav{background:var(--bg)!important}@media(max-width:680px){.install-banner{top:8px}.install-banner span{font-size:14px}.install-banner .button{font-size:15px;padding:8px 12px}}
-</style>
-<style>
-  .chart-controls{position:sticky;top:0;z-index:15;margin:-12px 0 14px;padding:12px 0;transition:background .16s,border-color .16s,box-shadow .16s}
-  .chart-controls.is-stuck{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px;background:var(--bg);border:1px solid var(--line);border-radius:0 0 12px 12px;box-shadow:0 8px 18px #0003}
-  @media(max-width:680px){.chart-controls{margin-left:-2px;margin-right:-2px}.chart-controls.is-stuck{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px}}
-</style>
-<style>
-  @media(max-width:680px){.main-nav{background:var(--bg)!important;opacity:1!important;isolation:isolate}.main-nav:before{content:'';position:absolute;inset:0;z-index:-1;background:var(--bg)}}
-</style>
-<style>
-  .history-head{margin-bottom:9px}.history-head h2,.history-head span,.history-entry,.history-entry small,.history-entry b{font-size:12px!important}.history-list{gap:7px}.history-entry{grid-template-columns:1fr 1fr 1.25fr;gap:5px 12px;padding:8px 10px;border-radius:10px;line-height:1.25}.history-entry span{gap:1px}.history-entry .history-comment{padding-top:5px;border-top:1px solid var(--line);line-height:1.35}.monthly-table{min-width:840px}.monthly-table th,.monthly-table td{white-space:nowrap}.monthly-table th:first-child,.monthly-table td:first-child{text-align:left!important;width:76px}.monthly-table th:nth-child(2),.monthly-table td:nth-child(2){width:86px}.monthly-table th:nth-child(3),.monthly-table td:nth-child(3){width:112px}.monthly-table th:nth-child(4),.monthly-table td:nth-child(4),.monthly-table th:nth-child(5),.monthly-table td:nth-child(5),.monthly-table th:nth-child(6),.monthly-table td:nth-child(6){width:78px}.monthly-table th:nth-child(7),.monthly-table td:nth-child(7){width:88px}.monthly-table th:nth-child(8),.monthly-table td:nth-child(8){width:96px}
-  @media(max-width:680px){.history-entry{grid-template-columns:1fr 1fr 1.15fr;gap:5px 8px;padding:8px}.monthly-table{min-width:812px}}
-</style>
-<style>
-  .income-history{margin-top:4px}.income-history h2{margin:0}.income-history .small{margin:7px 0 13px}.income-level-head,.income-level-row{display:grid;grid-template-columns:minmax(120px,1fr) 132px 132px 38px;gap:8px;align-items:center}.income-level-head{padding:0 4px 5px;color:var(--muted);font-size:12px;font-weight:800}.income-level-row{margin-bottom:8px}.income-level-row input{width:100%;margin:0}.income-level-remove{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--muted);font:24px/1 Arial,sans-serif;cursor:pointer}.income-level-remove:hover{color:var(--ink);border-color:var(--orange)}.income-history-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.income-history-actions .button{padding:9px 11px}.income-history-notice{min-height:19px;margin:9px 0 0;color:var(--muted);font-size:13px}@media(max-width:680px){.income-level-head,.income-level-row{grid-template-columns:minmax(0,1fr) 106px 106px 34px;gap:6px}.income-level-head{font-size:11px}.income-level-remove{width:34px;height:34px}.income-history-actions .button{flex:1}}
-</style>
-<style>
-</style>
-<style>
-  .monthly-table{min-width:972px}
-  .monthly-table thead th,.monthly-table thead th:first-child{text-align:center!important}
-  .monthly-table th:first-child{width:84px!important}
-  .monthly-table th:nth-child(2),.monthly-table td:nth-child(2){width:86px}
-  .monthly-table th:nth-child(3),.monthly-table td:nth-child(3){width:152px}
-  .monthly-table th:nth-child(4),.monthly-table td:nth-child(4),.monthly-table th:nth-child(5),.monthly-table td:nth-child(5),.monthly-table th:nth-child(6),.monthly-table td:nth-child(6),.monthly-table th:nth-child(7),.monthly-table td:nth-child(7){width:78px}
-  .monthly-table th:nth-child(8),.monthly-table td:nth-child(8){width:104px}
-  .monthly-table th:nth-child(1),.monthly-table td:nth-child(1){padding-right:16px!important}
-  .monthly-table th:nth-child(3),.monthly-table td:nth-child(3){padding-right:16px!important}
-  .monthly-table th:nth-child(7),.monthly-table td:nth-child(7){padding-right:24px!important}
-  .monthly-table td:nth-child(3) input{width:100px!important}
-  .monthly-table th:nth-child(5),.monthly-table td:nth-child(5),.monthly-table td:nth-child(5) input{color:#4d86c6!important}
-  .monthly-table th:nth-child(6),.monthly-table td:nth-child(6),.monthly-table td:nth-child(6) input{color:#d6a400!important}
-  .monthly-table th:nth-child(7),.monthly-table td:nth-child(7),.monthly-table td:nth-child(7) input{color:#c55d5b!important}
-  .monthly-table .megan{color:var(--green)!important}
-  .monthly-table .saved.saved-high{color:var(--green)!important}
-  .monthly-table .saved.saved-mid{color:#78c877!important}
-  .monthly-table .saved.saved-low{color:#d6a400!important}
-  .monthly-table .saved.saved-negative{color:#e66b68!important}
-  .monthly-table .saved.saved-locked::after{content:'🔒';margin-left:5px;font-size:10px;filter:grayscale(1);opacity:.55}
-  @media(max-width:680px){.monthly-table{min-width:972px}}
-</style>
-<style>
-  .choice-option.selected{color:#fff!important}.history-filter{margin:0 0 10px;width:min(360px,100%);height:40px}.history-entry{position:relative}.history-actions{display:flex;gap:6px;grid-column:1/-1;margin-top:1px}.history-actions button{border:1px solid var(--line);border-radius:7px;background:var(--soft);color:var(--muted);font:12px/1 'Figtree',sans-serif;padding:6px 8px;cursor:pointer}.history-actions button:hover{border-color:var(--orange);color:var(--ink)}.history-actions .history-delete:hover{border-color:#e66b68;color:#e66b68}.expense-edit-dialog{background:var(--surface);color:var(--ink);width:min(560px,calc(100vw - 32px));border:0;border-radius:16px;padding:0;box-shadow:0 18px 50px #0005}.expense-edit-dialog .dialog-inner{padding:24px}.expense-edit-dialog h2{padding-right:42px}.expense-edit-dialog .dialog-grid textarea{min-height:90px}.expense-edit-dialog::backdrop,.megan-reminder-dialog::backdrop{background:rgba(0,0,0,.5)}.megan-reminder-dialog{background:var(--surface);color:var(--ink);width:min(440px,calc(100vw - 32px));border:0;border-radius:16px;padding:0;box-shadow:0 18px 50px #0005}.megan-reminder-dialog .dialog-inner{padding:24px}.megan-reminder-dialog h2{padding-right:42px}.megan-reminder-dialog p{margin:10px 0 0}.backup-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}.backup-section h2{margin:0}.backup-section .toolbar{margin:12px 0 0;flex-wrap:wrap}.backup-section .small{margin:7px 0 0}@media(max-width:680px){.expense-edit-dialog,.megan-reminder-dialog{width:calc(100vw - 24px)}.expense-edit-dialog .dialog-inner,.megan-reminder-dialog .dialog-inner{padding:20px 16px}}
-</style>
-<style>
-  .todo-done summary:after{display:none}.todo-done-chevron{width:22px;height:22px;fill:none;stroke:var(--muted);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;transition:transform .16s}.todo-done[open] .todo-done-chevron{transform:rotate(90deg)}.todo-check-icon{display:none;width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round}.todo-check input:checked+span{color:#f4fbf8!important}.todo-check input:checked+span .todo-check-icon{display:block}#todoEditDialog textarea,#todoEditDialog input{background:#fffdf8!important;color:#10272b!important;border-color:#c8d9d7!important;color-scheme:light}#todoEditDialog textarea::placeholder{color:#5d7575}.history-list{gap:8px}.history-entry{grid-template-columns:minmax(130px,1.15fr) minmax(120px,1fr) minmax(106px,.78fr) auto auto!important;gap:16px!important;align-items:center!important;padding:12px 16px!important}.history-entry span{gap:1px}.history-entry small{display:none}.history-entry b{font-size:16px!important;line-height:1.15}.history-entry .history-date b,.history-entry .history-kind b{display:block}.history-entry .history-date time,.history-entry .history-kind span{display:block;margin-top:4px;color:var(--muted);font-size:14px;line-height:1.1}.history-entry .history-final{color:var(--green);font-size:35px!important;font-weight:800;letter-spacing:-.055em;white-space:nowrap}.history-entry .history-actions{grid-column:auto!important;margin:0!important;gap:8px}.history-icon-button{display:grid;place-items:center;width:38px;height:38px;padding:0!important;border:0!important;background:transparent!important;color:var(--muted)!important;cursor:pointer}.history-icon-button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}.history-icon-button:hover,.history-icon-button:focus-visible{color:var(--ink)!important;outline:2px solid var(--orange);outline-offset:2px}.history-icon-button.history-delete:hover{color:#e66b68!important}@media(max-width:680px){.history-entry{grid-template-columns:minmax(94px,1fr) minmax(78px,.84fr) minmax(75px,.78fr) 34px 34px!important;gap:6px!important;padding:10px 10px!important}.history-entry b{font-size:14px!important}.history-entry .history-date time,.history-entry .history-kind span{font-size:12px}.history-entry .history-final{font-size:25px!important}.history-icon-button{width:34px;height:34px}.history-icon-button svg{width:22px;height:22px}}
-</style>
-<style>.history-entry{grid-template-columns:minmax(130px,1.15fr) minmax(120px,1fr) minmax(106px,.78fr) auto!important}@media(max-width:680px){.history-entry{grid-template-columns:minmax(94px,1fr) minmax(78px,.84fr) minmax(75px,.78fr) auto!important}}</style>
-<style>
-  .nav-tab,.chart-tabs button.selected,.bill-tabs button.selected,.todo-check span,.todo-date-group h3,.income-level-head,.todo-edit-dialog label,.history-entry .history-final{font-weight:700!important}.metric strong,.todo-check span{font-size:20px!important}.history-filter{display:block;width:100%!important;max-width:none!important}.chart-controls.is-stuck{margin-left:0!important;margin-right:0!important;padding-left:0!important;padding-right:0!important}@media(max-width:680px){.header-actions{padding-left:24px!important;padding-right:24px!important}#expenseDialog .dialog-inner{padding-left:24px!important;padding-right:24px!important}#expenseDialog .dialog-inner>.toolbar:last-child{margin-left:-24px!important;margin-right:-24px!important;padding-left:24px!important;padding-right:24px!important}.notes-dialog,.todo-edit-dialog{width:calc(100vw - 48px)!important}.history-entry .history-final{font-size:20px!important}}@media(max-width:450px){.app{padding-left:24px!important;padding-right:24px!important}}
-</style>
-<style>.history-entry .history-comment{grid-column:1/-1!important;margin:8px 0!important;color:var(--ink)!important;font-size:14px!important;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere}</style>
-<style>
-  :root{--space-1:4px;--space-2:8px;--space-3:16px;--space-4:32px}.app{padding:32px!important}.top-header{padding-bottom:16px!important}.toolbar{gap:8px!important}.metrics,.grid,.chart-grid,.dialog-grid{gap:16px!important}.metric,.panel,.chart-card{padding:16px!important}.chart-card{min-height:0!important}.table th,.table td{padding:8px!important}.button{padding:8px 16px!important}.button.primary{padding:16px!important}.toolbar select,select,input{padding:8px!important}.todo-form{gap:8px!important;margin-bottom:32px!important}.todo-form textarea{padding:8px!important}.todo-form .button{padding:8px!important}.todo-list{gap:32px!important}.todo-group .todo-stack,.history-list{gap:8px!important}.todo-card{padding:8px!important}.history-entry{padding:8px 16px!important}.history-entry .history-comment{margin:8px 0!important}.dialog-inner,.notes-dialog .dialog-inner,.todo-edit-dialog .dialog-inner,.expense-edit-dialog .dialog-inner,.megan-reminder-dialog .dialog-inner{padding:32px!important}.install-banner{width:min(calc(100% - 64px),520px)!important;padding:8px 16px!important}.metric,.panel,.table-wrap,.year-table,.chart-card,.history-entry,.todo-card,.todo-form textarea,.todo-form input,.todo-form .button,.notes-button,.todo-edit,.choice-option,.year-timeline button,.install-banner,dialog,.notes-dialog,.todo-edit-dialog,.expense-edit-dialog,.megan-reminder-dialog{border-radius:8px!important}.todo-done-actions{display:flex;align-items:center;gap:8px}.todo-clear-done{border:0;background:transparent;color:var(--muted);padding:4px!important;font:inherit;font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}.todo-clear-done:hover,.todo-clear-done:focus-visible{color:var(--ink);outline:2px solid var(--orange);outline-offset:2px;border-radius:4px}@media(max-width:680px){.app{padding:32px 32px 160px!important}.header-actions{padding-left:32px!important;padding-right:32px!important}#expenseDialog .dialog-inner{padding:32px 32px 128px!important}#expenseDialog .dialog-inner>.toolbar:last-child{bottom:-32px!important;margin:-0px -32px -32px!important;padding:16px 32px!important}.notes-dialog,.todo-edit-dialog,.expense-edit-dialog,.megan-reminder-dialog{width:calc(100vw - 64px)!important}.notes-dialog .dialog-inner,.todo-edit-dialog .dialog-inner,.expense-edit-dialog .dialog-inner,.megan-reminder-dialog .dialog-inner{padding:32px!important}.todo-card{padding:8px!important}}
-</style>
-<style>@media(max-width:680px){#expenseDialog .dialog-inner>.toolbar:last-child{margin:16px -32px -32px!important}}</style>
-<style>.utility-alert{margin:0 0 16px;padding:8px 16px;border:1px solid #dca62f;border-radius:8px;background:color-mix(in srgb,#dca62f 20%,var(--surface));color:var(--ink);font-size:16px;font-weight:700;line-height:1.4}.monthly-table th:nth-child(4),.monthly-table td:nth-child(4),.monthly-table th:nth-child(5),.monthly-table td:nth-child(5),.monthly-table th:nth-child(6),.monthly-table td:nth-child(6),.monthly-table th:nth-child(7),.monthly-table td:nth-child(7){width:96px!important}.monthly-table th:nth-child(8),.monthly-table td:nth-child(8){text-align:center!important}.monthly-table td.utility-missing{background:color-mix(in srgb,#dca62f 18%,transparent)!important}@media(max-width:680px){.utility-alert{padding:8px 16px;margin-bottom:16px;font-size:14px}}</style>
-<style>body.auth-locked .app,body.auth-locked dialog{display:none!important}</style>
-<style>
-  .metric-value-feedback { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; }
-  .metric-value-feedback > strong { margin-right:0!important; }
-  .metric-expense-delta {
-    color:#e5484d!important;
-    font-size:15px!important;
-    font-weight:700;
-    white-space:nowrap;
-    animation:metric-expense-confirmation 2.5s ease both;
-  }
-  @keyframes metric-expense-confirmation {
-    0% { opacity:0; transform:translateY(2px); }
-    10%, 90% { opacity:1; transform:translateY(0); }
-    100% { opacity:0; transform:translateY(-2px); }
-  }
-  @media (prefers-reduced-motion:reduce) {
-    .metric-expense-delta { animation:none; }
-  }
-</style>
-</head>
-<body class="auth-locked"><main class="app">
-  <aside id="installBanner" class="install-banner hidden" aria-label="Install Estuary"><span>Install Estuary for faster access.</span><div><button class="button primary" id="installApp">Install</button><button class="install-dismiss" id="dismissInstall" aria-label="Dismiss install prompt">×</button></div></aside>
-  <header class="top-header"><div><h1>Budget</h1></div><nav class="main-nav" aria-label="Primary navigation"><button class="nav-tab tab active" data-tab="overview" aria-label="Overview" title="Overview"><span class="nav-icon">⌂</span><span class="nav-label">Overview</span></button><button class="nav-tab tab" data-tab="months" aria-label="Months" title="Months"><span class="nav-icon">▦</span><span class="nav-label">Months</span></button><button class="nav-tab tab" data-tab="history" aria-label="History" title="History"><span class="nav-icon">☷</span><span class="nav-label">History</span></button><button class="nav-tab tab" data-tab="investments" aria-label="Investments" title="Investments"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 18 9 13l3 3 7-9M15 7h4v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nav-label">Investments</span></button><button class="nav-tab tab" data-tab="accounts" aria-label="Accounts" title="Accounts"><span class="nav-icon"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2Zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7Z" fill="currentColor"/><path d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1Z" fill="currentColor"/></svg></span><span class="nav-label">Accounts</span></button><button class="nav-tab tab" data-tab="settings" aria-label="Settings" title="Settings"><span class="nav-icon">⚙</span><span class="nav-label">Settings</span></button></nav><div class="header-actions"><button class="hidden" id="themeToggle">Light mode</button><button class="button primary" id="addExpense">+ Add expense</button></div></header>
-  <p class="notice hidden" id="notice" aria-live="polite"></p>
-  <section id="overview"><select class="hidden" id="monthPicker"></select><aside id="utilityAlert" class="utility-alert hidden" role="status" aria-live="polite"></aside><div class="metrics overview-metrics" id="metrics"></div><section class="charts" id="chartArea"></section></section>
-  <section id="months" class="hidden"><div class="year-timeline" id="yearTimeline"></div><div class="year-table" id="monthlyYearTable"></div></section>
-  <section id="history" class="hidden"><div class="history-head"><h2>Expense history</h2><span id="historyCount"></span></div><div class="history-list" id="historyEntries"></div></section>
-  <section id="investments" class="hidden"><div class="investment-page-heading"><div><p class="eyebrow">INVESTMENTS</p><h2>Portfolio</h2><p>Track contributions separately from market gains and losses.</p></div></div><div class="investment-summary" id="investmentSummary"></div><div class="investment-account-grid" id="investmentAccountGrid"></div><details class="panel investment-ledger"><summary class="history-head"><span><b>Contribution history</b><small id="investmentCount"></small></span><span class="investment-disclosure" aria-hidden="true">⌄</span></summary><div class="history-list" id="investmentEntries"></div></details><details class="panel investment-settings"><summary><span>Investment settings</span><button type="button" class="button ghost investment-update-totals" id="updateInvestmentTotals">Update totals</button></summary><div class="investment-settings-content"><p class="small">Add accounts, set yearly goals, and configure automatic 401(k) contributions.</p><div id="investmentAccountSettings"></div><button type="button" class="button ghost investment-add-account" id="addInvestmentAccount">+ Add account</button></div></details></section>
-  <section id="accounts" class="hidden"><div id="accountsContent"></div></section>
-  <section id="settings" class="hidden"><div class="grid"><article class="panel settings"><p class="eyebrow">STATIC VALUES</p><h2>Budget settings</h2><p class="small">These values sync privately between your signed-in devices.</p><label>Monthly income<input type="number" data-setting="monthlyIncome"></label><label>Fixed monthly expenses<input type="number" data-setting="fixedExpenses"></label><label>Kevin mortgage<input type="number" data-setting="kevinMortgage"></label><label>Kevin grocery share (%)<input type="number" step="0.1" data-setting="foodShare"></label><label>R value 1 for Megan<input type="number" data-setting="meganR1"></label><label>R value 2 for Megan<input type="number" data-setting="meganR2"></label><p class="small">Megan owes = her grocery share + these two R values.</p></article><article class="panel settings"><p class="eyebrow">FIREBASE SYNC</p><h2>Your private budget</h2><p class="small">Sign in with the same Google account on each device. Your budget stays private and syncs automatically.</p><div class="toolbar" style="margin-top:18px"><button class="button" id="firebaseSignIn">Sign in with Google</button><button class="button ghost" id="firebaseSignOut">Sign out</button></div><p class="small" id="firebaseStatus" style="margin-top:14px">Connecting to Firebase…</p></article></div></section>
-</main>
-<dialog id="expenseDialog"><div class="dialog-inner"><button class="dialog-close" id="closeExpense" aria-label="Close add expense dialog">×</button><h2>Add an expense</h2><p class="small">The discounted amount is added to the matching monthly total.</p><div class="dialog-grid"><label>Amount<input id="expenseAmount" inputmode="decimal" placeholder="0.00" autofocus></label><label class="full-row">Type<input id="expenseType" type="hidden" value="Spending"><div class="option-grid" id="typeOptions"><button type="button" class="choice-option selected" data-expense-type="Spending">Spending</button><button type="button" class="choice-option" data-expense-type="Water">Water</button><button type="button" class="choice-option" data-expense-type="Electricity">Electricity</button><button type="button" class="choice-option" data-expense-type="Gas">Gas</button><button type="button" class="choice-option" data-expense-type="Groceries">Groceries</button></div></label><label class="full-row">CC modifier<input id="expenseModifier" type="hidden" value="0.95"><div class="option-grid modifier-grid" id="modifierOptions"><button type="button" class="choice-option" data-expense-modifier="0.90">0.90</button><button type="button" class="choice-option" data-expense-modifier="0.91">0.91</button><button type="button" class="choice-option" data-expense-modifier="0.92">0.92</button><button type="button" class="choice-option" data-expense-modifier="0.93">0.93</button><button type="button" class="choice-option" data-expense-modifier="0.94">0.94</button><button type="button" class="choice-option selected" data-expense-modifier="0.95">0.95</button><button type="button" class="choice-option" data-expense-modifier="0.96">0.96</button><button type="button" class="choice-option" data-expense-modifier="0.97">0.97</button><button type="button" class="choice-option" data-expense-modifier="0.98">0.98</button><button type="button" class="choice-option" data-expense-modifier="0.99">0.99</button><button type="button" class="choice-option" data-expense-modifier="1.00">1.00</button></div></label><label>Month<select id="expenseMonth"></select></label><label class="full-row" id="commentField">Comment<textarea id="expenseComment" placeholder="What was this for?"></textarea></label></div><div class="final"><span>Final amount</span><strong id="finalAmount">$0.00</strong></div><div class="toolbar modal-actions"><button class="button ghost" id="cancelExpense">Cancel</button><button class="button primary" id="saveExpense">Add expense</button></div></div></dialog>
-<dialog id="extraIncomeDialog" class="extra-income-dialog"><form class="dialog-inner" id="extraIncomeForm"><button type="button" class="dialog-close" id="closeExtraIncome" aria-label="Close extra income dialog">×</button><h2 id="extraIncomeDialogTitle">Add extra income</h2><p class="small" id="extraIncomeDialogDescription">This amount will be subtracted from Spending for the selected month.</p><div class="dialog-grid"><label class="extra-income-amount"><span>Amount</span><input id="extraIncomeAmount" inputmode="decimal" placeholder="0.00" aria-label="Amount" required></label><label><span>Month</span><select id="extraIncomeMonth" aria-label="Month"></select></label><label class="full-row"><span>Category</span><div class="option-grid extra-income-categories" id="extraIncomeCategories"><button type="button" class="choice-option selected" data-extra-income-category="Signup Bonus">Signup Bonus</button><button type="button" class="choice-option" data-extra-income-category="Gift">Gift</button><button type="button" class="choice-option" data-extra-income-category="Misc">Misc</button></div><input id="extraIncomeCategory" type="hidden" value="Signup Bonus"></label><label class="full-row"><span>Description <small>(optional)</small></span><textarea id="extraIncomeDescription" maxlength="300" placeholder="Where did this come from?"></textarea></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelExtraIncome">Cancel</button><button type="submit" class="button primary" id="saveExtraIncome">Add extra income</button></div></form></dialog>
-<dialog id="investmentDialog" class="investment-dialog"><form class="dialog-inner" id="investmentForm"><button type="button" class="dialog-close" id="closeInvestment" aria-label="Close investment dialog">×</button><h2 id="investmentDialogTitle">Add investment</h2><div class="dialog-grid"><label class="investment-amount"><span>Contribution amount</span><input id="investmentAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" aria-label="Contribution amount" required></label><label><span>Date</span><input id="investmentDate" type="date" aria-label="Contribution date" required></label><label class="full-row"><span>Account</span><div class="option-grid investment-account-options" id="investmentAccountOptions"></div><input id="investmentAccount" type="hidden"></label><label class="full-row"><span>Description <small>(optional)</small></span><textarea id="investmentDescription" maxlength="300" placeholder="Add a note"></textarea></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelInvestment">Cancel</button><button type="submit" class="button primary" id="saveInvestment">Add investment</button></div></form></dialog>
-<dialog id="investmentTotalsDialog" class="investment-dialog investment-totals-dialog"><form class="dialog-inner" id="investmentTotalsForm"><button type="button" class="dialog-close" id="closeInvestmentTotals" aria-label="Close totals dialog">×</button><h2>Update totals</h2><p class="small">Enter each account’s current value. Leaving a field blank keeps its last known value.</p><div class="investment-total-fields" id="investmentTotalFields"></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelInvestmentTotals">Cancel</button><button type="submit" class="button primary">Save totals</button></div></form></dialog>
-<dialog id="investmentAccountDialog" class="investment-dialog"><form class="dialog-inner" id="investmentAccountForm"><button type="button" class="dialog-close" id="closeInvestmentAccount" aria-label="Close account dialog">×</button><h2>Add investment account</h2><div class="dialog-grid"><label class="full-row"><span>Account name</span><input id="newInvestmentAccountName" type="text" maxlength="60" required></label><label class="full-row"><span>Type</span><select id="newInvestmentAccountType"><option>IRA</option><option>401k</option><option>Brokerage</option><option>Savings</option></select></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelInvestmentAccount">Cancel</button><button type="submit" class="button primary">Add account</button></div></form></dialog>
-<dialog id="accountDialog" class="account-dialog"><form class="dialog-inner" id="accountForm"><button type="button" class="dialog-close" id="closeAccount" aria-label="Close account dialog">×</button><h2 id="accountDialogTitle">Add account</h2><div class="account-image-editor"><div class="account-image-preview" id="accountImagePreview" aria-label="Account artwork preview"></div><div class="account-image-actions"><label class="button ghost account-upload-button">Upload SVG<input id="accountImageFile" type="file" accept="image/svg+xml,.svg"></label><button type="button" class="button ghost" id="removeAccountImage">Remove image</button><p class="small" id="accountImageStatus">SVG only · maximum 100 KB</p></div></div><div class="dialog-grid"><label class="full-row"><span>Name</span><input id="accountName" maxlength="80" required></label><label class="full-row"><span>Type</span><div class="option-grid account-kind-options"><button type="button" class="choice-option selected" data-account-kind="Credit Card">Credit Card</button><button type="button" class="choice-option" data-account-kind="Bank Account">Bank Account</button></div><input id="accountKind" type="hidden" value="Credit Card"></label><label class="full-row"><span>Use</span><textarea id="accountUse" maxlength="500" placeholder="What do you use this account for?"></textarea></label><label class="full-row"><span>Signup bonus notes</span><textarea id="accountSignupBonus" maxlength="1000" placeholder="Bonus amount, spending requirement, deadline, or progress"></textarea></label><label class="full-row"><span>Status</span><select id="accountStatus"><option>Active</option><option>Closed</option></select></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelAccount">Cancel</button><button type="submit" class="button primary" id="saveAccount">Add account</button></div></form></dialog>
-<dialog id="notesDialog" class="notes-dialog"><div class="dialog-inner"><button class="dialog-close" id="closeNotes" aria-label="Close notes">×</button><h2 id="notesTitle">Monthly notes</h2><section id="notesExtraIncome" class="notes-extra-income hidden" aria-label="Extra income for this month"></section><label class="notes-text-label"><span>Notes</span><textarea id="notesText" maxlength="500" placeholder="Add notes for this month"></textarea></label><div class="notes-meta"><span id="notesCount">0 / 500</span></div><div class="toolbar"><button class="button ghost" id="cancelNotes">Cancel</button><button class="button primary" id="saveNotes">Save notes</button></div></div></dialog>
-
-
-
-<style>
-  /* Keep the month identifier visible while the rest of a year table scrolls. */
-  .monthly-table thead th:first-child,
-  .monthly-table tbody th:first-child {
-    position: sticky;
-    left: 0;
-    background: var(--surface);
-    background-clip: padding-box;
-    box-shadow: 2px 0 0 var(--line);
-  }
-  .monthly-table thead th:first-child {
-    z-index: 3;
-    background: var(--soft);
-  }
-  .monthly-table tbody th:first-child { z-index: 2; }
-</style>
-
-<style>
-  #expenseDialog .expense-amount-field,
-  #expenseDialog .expense-final-field { min-width:0; }
-  #expenseDialog .expense-final-field strong {
-    display:flex; align-items:center; min-height:42px; padding:8px;
-    box-sizing:border-box; border:1px solid var(--line); border-radius:8px;
-    background:var(--soft); color:var(--ink); font-size:18px;
-  }
-  #expenseDialog .expense-suboptions { display:grid; gap:8px; margin-top:16px; }
-  #expenseDialog .expense-suboptions > span { color:var(--muted); font-size:14px; font-weight:700; }
-  #expenseDialog .shopping-suboptions { grid-template-columns:repeat(3,minmax(0,1fr)); }
-  @media (max-width:680px) {
-    #expenseDialog .dialog-inner { display:flex; flex-direction:column; height:100dvh; overflow:hidden; padding:32px 24px 0!important; }
-    #expenseDialog .dialog-grid { flex:1; min-height:0; overflow-y:auto; padding:0 0 16px; }
-    #expenseDialog .dialog-inner > .toolbar.modal-actions { position:relative!important; bottom:auto!important; flex:none; width:calc(100% + 48px); margin:0 -24px!important; padding:16px 24px max(16px, env(safe-area-inset-bottom))!important; background:var(--surface); border-top:1px solid var(--line); }
-    #expenseDialog .shopping-suboptions { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  }
-</style>
-
-<style>
-  .category-bars-chart { grid-column:1 / -1; margin-top:16px; }
-  .category-bar-viewport { width:100%; overflow-x:auto; margin-top:16px; }
-  .category-bar-svg { display:block; width:100%; min-width:780px; height:auto; color:var(--muted); }
-  .category-bar { shape-rendering:geometricPrecision; }
-  .category-bar:hover { opacity:.78; }
-  .category-bar-month { font-size:13px; }
-  .category-bar-legend { display:flex; justify-content:center; flex-wrap:wrap; gap:12px 18px; margin-top:8px; color:var(--muted); font-size:14px; }
-  .category-bar-legend span { display:flex; align-items:center; gap:6px; }
-  .category-bar-legend i { width:12px; height:12px; border-radius:2px; }
-  @media (max-width:680px) {
-    .category-bars-chart { margin-top:16px; }
-    .category-bar-viewport { margin-left:-4px; width:calc(100% + 8px); }
-    .category-bar-svg { min-width:760px; }
-    .category-bar-legend { justify-content:flex-start; font-size:13px; gap:8px 12px; }
-  }
-</style>
-
-<style>
-  .nav-tab .nav-icon { display:grid; place-items:center; width:20px; height:20px; line-height:1; }
-  .nav-tab .nav-icon svg { display:block; width:20px; height:20px; }
-  .notes-button svg { display:block; width:14px; height:14px; }
-  .history-icon-button svg { display:block; width:24px; height:24px; }
-  .history-icon-button.history-delete svg { width:23px; height:25px; }
-  @media (max-width:680px) {
-    .nav-tab .nav-icon, .nav-tab .nav-icon svg { width:22px; height:22px; }
-  }
-</style>
-
-
-
-<style>
-  #expenseDialog .dialog-grid {
-    grid-template-columns:minmax(0,1fr) max-content!important;
-    gap:8px 16px!important;
-  }
-  #expenseDialog .expense-amount-field,
-  #expenseDialog .expense-final-field { grid-column:auto!important; margin:0!important; }
-  #expenseDialog .expense-final-field {
-    display:flex!important; align-items:baseline; align-self:end; gap:6px;
-    width:max-content; padding-left:16px; color:var(--muted); font-size:14px!important;
-  }
-  #expenseDialog .expense-final-field strong {
-    display:inline!important; min-height:0!important; padding:0!important;
-    border:0!important; border-radius:0!important; background:transparent!important;
-    color:var(--ink)!important; font-size:18px!important;
-  }
-  #expenseDialog #expenseCategoryOptions .choice-option,
-  #expenseDialog .expense-suboptions .choice-option,
-  #expenseDialog #newModifierOptions .choice-option {
-    padding:8px!important; font-size:14px!important; font-weight:500!important;
-  }
-  #expenseDialog .expense-suboptions { margin-top:8px!important; }
-  #expenseDialog #newModifierOptions {
-    display:grid!important; grid-template-columns:repeat(6,max-content)!important;
-    gap:4px!important; justify-content:start;
-  }
-  .modal-actions { gap:8px!important; margin-top:8px!important; }
-  .modal-actions .button { height:48px; min-height:48px; padding:8px 16px!important; }
-  @media (max-width:680px) {
-    #expenseDialog .dialog-grid { grid-template-columns:minmax(0,1fr) max-content!important; }
-    #expenseDialog .dialog-grid .full-row { grid-column:1 / -1!important; }
-    #expenseDialog .dialog-grid .expense-final-field { padding-left:16px!important; }
-    #expenseDialog .dialog-inner > .toolbar.modal-actions { gap:8px!important; }
-  }
-</style>
-<style>
-  button { font-weight:500!important; }
-  .main-nav .nav-tab { font-weight:500!important; }
-  .chart-controls.is-stuck {
-    margin-left:-8px!important;
-    margin-right:-8px!important;
-    padding:8px!important;
-    background:var(--bg)!important;
-    border:1px solid var(--line)!important;
-    border-radius:0 0 8px 8px!important;
-    box-shadow:0 8px 18px #0003!important;
-  }
-  @media (max-width:680px) {
-    .main-nav .nav-tab.active:before { left:0!important; right:0!important; }
-    .year-timeline {
-      margin-left:-32px!important;
-      margin-right:-32px!important;
-      padding-left:32px!important;
-      padding-right:32px!important;
-      scroll-padding-inline:32px;
-    }
-  }
-</style>
-
-<style>
-  .history-entry .history-final { font-size:20px!important; }
-  #expenseDialog input, #expenseDialog select, #expenseDialog textarea,
-  #expenseEditDialog input, #expenseEditDialog select, #expenseEditDialog textarea,
-  #expenseDialog .choice-option, #expenseEditDialog .choice-option {
-    min-height:48px!important;
-  }
-  #expenseDialog textarea, #expenseEditDialog textarea {
-    height:48px!important; min-height:48px!important; resize:none!important; overflow:hidden!important;
-  }
-  #expenseEditDialog { background:var(--surface); color:var(--ink); width:min(560px,calc(100vw - 32px)); border:0; border-radius:8px; padding:0; box-shadow:0 18px 50px #0005; }
-  #expenseEditDialog .dialog-inner { padding:32px; }
-  #expenseEditDialog .dialog-grid { grid-template-columns:minmax(0,1fr) max-content!important; gap:8px 16px!important; }
-  #expenseEditDialog .expense-amount-field, #expenseEditDialog .expense-final-field { grid-column:auto!important; margin:0!important; }
-  #expenseEditDialog .expense-final-field { display:flex!important; align-items:baseline; align-self:end; gap:6px; width:max-content; padding-left:16px; color:var(--muted); font-size:14px!important; }
-  #expenseEditDialog .expense-final-field strong { display:inline!important; min-height:0!important; padding:0!important; border:0!important; border-radius:0!important; background:transparent!important; color:var(--ink)!important; font-size:18px!important; }
-  #expenseEditDialog .expense-suboptions { margin-top:8px!important; }
-  #expenseEditDialog .shopping-suboptions { grid-template-columns:repeat(3,minmax(0,1fr)); }
-  #expenseEditDialog #expenseEditModifierOptions { display:grid!important; grid-template-columns:repeat(6,max-content)!important; gap:4px!important; justify-content:start; }
-  #expenseEditDialog .choice-option { padding:8px!important; font-size:14px!important; font-weight:500!important; }
-  #expenseEditDialog::backdrop { background:rgba(0,0,0,.5); }
-  :root[data-theme="light"] #expenseDialog .choice-option.selected,
-  :root[data-theme="light"] #expenseEditDialog .choice-option.selected { border-color:transparent!important; box-shadow:none!important; }
-  @media (max-width:680px) {
-    #expenseEditDialog { position:fixed; inset:0; width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; border-radius:0; }
-    #expenseEditDialog .dialog-inner { display:flex; flex-direction:column; height:100dvh; overflow:hidden; padding:32px 24px 0!important; }
-    #expenseEditDialog .dialog-grid { flex:1; min-height:0; overflow-y:auto; padding:0 0 16px; grid-template-columns:minmax(0,1fr) max-content!important; }
-    #expenseEditDialog .dialog-grid .full-row { grid-column:1 / -1!important; }
-    #expenseEditDialog .shopping-suboptions { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    #expenseEditDialog .dialog-inner > .toolbar.modal-actions { position:relative!important; bottom:auto!important; flex:none; width:calc(100% + 48px); margin:0 -24px!important; padding:16px 24px max(16px,env(safe-area-inset-bottom))!important; background:var(--surface); border-top:1px solid var(--line); }
-  }
-</style>
-<style>
-  @media (max-width:680px) {
-    #expenseDialog .dialog-grid,
-    #expenseEditDialog .dialog-grid {
-      align-content:start!important;
-      align-items:start!important;
-      grid-auto-rows:max-content!important;
-    }
-    #expenseDialog .dialog-grid > *,
-    #expenseEditDialog .dialog-grid > * { align-self:start!important; }
-  }
-</style>
-<style>
-  .notes-dialog textarea {
-    background:var(--soft)!important;
-    color:var(--ink)!important;
-    border-color:var(--line)!important;
-  }
-  .notes-dialog textarea::placeholder { color:var(--muted)!important; }
-  .notes-dialog .toolbar {
-    display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:8px!important;
-    width:100%;
-    margin-top:8px!important;
-  }
-  .notes-dialog .toolbar .button {
-    width:100%;
-    height:48px;
-    min-height:48px;
-    padding:8px 16px!important;
-  }
-</style>
-
-<style>
-  #chartArea > p.small { display:none!important; }
-  .history-icon-button { overflow:visible!important; background:transparent!important; border:0!important; }
-  .history-icon-button svg { display:block!important; width:21px!important; height:21px!important; overflow:visible!important; }
-</style>
-<style>
-  body.auth-locked .app,
-  body.auth-locked dialog { display:none!important; }
-  body:not(.auth-locked) #authGate { display:none!important; }
-  #authGate {
-    min-height:100dvh;
-    display:grid;
-    place-items:center;
-    padding:32px;
-    background:var(--bg);
-  }
-  #authGate .auth-card {
-    width:min(100%,420px);
-    display:grid;
-    gap:16px;
-    padding:32px;
-    border:1px solid var(--line);
-    border-radius:8px;
-    background:var(--surface);
-    color:var(--ink);
-    text-align:center;
-  }
-  #authGate h1 { margin:0; font-size:30px; }
-  #authGate p { margin:0; color:var(--muted); }
-  #authGate .button { width:100%; min-height:48px; }
-  #authGateStatus { min-height:22px; font-size:14px; }
-</style>
-
-<style>
-  .top-header .brand-mark { display:grid; place-items:center; width:40px; height:40px; }
-  .top-header .brand-mark img { display:block; width:40px; height:40px; object-fit:contain; }
-  #expenseEditCategoryOptions [data-edit-category="Bills"],
-  #expenseEditBillSuboptions { display:none!important; }
-</style>
-
-<style>
-  .chart-card-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
-  .chart-average { color:var(--muted); font-size:14px; white-space:nowrap; }
-  .expense-settings-tabs { margin-top:20px; }
-  .settings-tab-list { display:flex; gap:8px; margin:0 0 16px; }
-  .settings-tab { border:1px solid var(--line); border-radius:8px; background:var(--soft); color:var(--muted); padding:8px 12px; font:inherit; cursor:pointer; }
-  .settings-tab.active { background:var(--orange); border-color:var(--orange); color:#10272b; }
-  .settings-tab-panel[hidden] { display:none!important; }
-  .finance-notes-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; align-items:start; margin-top:6px; }
-  .finance-notes-field textarea { box-sizing:border-box; width:100%; min-width:0; min-height:120px; overflow:hidden; resize:none; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); padding:10px; font:inherit; line-height:1.45; }
-  .finance-notes-actions { display:flex; justify-content:flex-end; margin-top:10px; }
-  .fixed-expense-items { display:grid; gap:8px; }
-  .fixed-expense-row { display:grid; grid-template-columns:minmax(0,1fr) 116px 36px; gap:8px; align-items:center; }
-  .fixed-expense-remove { width:36px; height:36px; border:0; border-radius:8px; background:var(--soft); color:var(--muted); font:22px/1 Arial,sans-serif; cursor:pointer; }
-  .fixed-expense-remove:disabled { opacity:.35; cursor:not-allowed; }
-  .fixed-expense-actions { margin-top:12px; }
-  @media (min-width:681px) {
-    .top-header { padding-bottom:0!important; }
-    .top-header .brand-mark,
-    .top-header .brand-mark img { width:50px!important; height:50px!important; }
-    .top-header .brand-mark img { border-radius:16px; }
-    .main-nav .nav-tab.active:after { bottom:-1px!important; z-index:1; }
-  }
-  @media (max-width:680px) {
-    .app { padding-top:32px!important; }
-    .app > section:not(#settings) { margin-top:0!important; }
-    .todo-form textarea { height:50px!important; min-height:50px!important; padding:8px 16px!important; background:#fff!important; color:#10272b!important; line-height:32px!important; }
-    .todo-form textarea::placeholder { color:#5d7575!important; }
-    .todo-check { width:32px!important; height:32px!important; }
-    .todo-check span { width:28px!important; height:28px!important; border-radius:4px!important; }
-  }
-  .todo-form textarea { background:#fff!important; color:#10272b!important; display:block; }
-  .todo-check { width:32px!important; height:32px!important; }
-  .todo-check span { width:28px!important; height:28px!important; border-radius:4px!important; }
-</style>
-
-<style>
-  #settings > .grid.settings-panel-stack { display:grid!important; grid-template-columns:minmax(0,1fr)!important; gap:16px!important; max-width:none!important; }
-  #settings .settings-display,
-  #settings .settings-sync,
-  #settings .settings-backup,
-  #settings .settings-budget { width:100%; }
-  #settings .settings-panel-heading { margin:0 0 16px; }
-  #settings .settings-panel-heading .eyebrow { margin:0 0 4px; }
-  #settings .settings-panel-heading h2 { margin:0; }
-  #settings .settings-panel-heading .small { margin:6px 0 0; }
-  #settings .settings-budget > .eyebrow { display:none; }
-  #settings .settings-budget > h2 { margin:0; }
-  #settings .settings-budget > .small { margin:6px 0 16px; }
-  #settings .budget-settings-divider { border:0; border-top:1px solid var(--line); margin:24px 0; }
-  #settings .settings-display .display-mode-control { margin:20px 0 0; }
-  #settings .settings-backup .backup-section { margin:0!important; padding:0!important; border:0!important; }
-  #settings .settings-backup .backup-section > .eyebrow,
-  #settings .settings-backup .backup-section > h2,
-  #settings .settings-backup .backup-section > .small { display:none; }
-  #settings .settings-backup .backup-section .toolbar { margin:0!important; }
-  #settings .settings-sync #firebaseSignOut.hidden,
-  #settings .settings-sync #firebaseSignIn.hidden { display:none!important; }
-</style>
-<style>
-  @media (min-width:681px) {
-    .top-header { border-bottom:0!important; }
-    .top-header .brand-mark img { border-radius:8px!important; }
-  }
-  #settings .panel { width:100%!important; max-width:none!important; }
-  .income-level-current { color:var(--muted); }
-  :root[data-theme="light"] .year-timeline button.selected { background:#fff9ed!important; }
-</style>
-
-
-<style>
-  .overview-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:0 0 16px; padding:12px; border:1px solid var(--line); border-radius:8px; background:var(--soft); }
-  .overview-insight { margin:0; color:var(--ink); font-size:15px; line-height:1.35; }
-  .overview-insight b { color:var(--orange); }
-  @media (max-width:680px) { .overview-insights { grid-template-columns:1fr; gap:10px; } }
-</style>
-
-<style>
-  #settings .settings-install { width:100%; }
-  #settings .settings-install .install-banner { position:static!important; transform:none!important; display:flex!important; width:100%!important; padding:0!important; border:0!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; }
-  #settings .settings-install .install-banner > span { display:none; }
-  #settings .settings-install .install-banner > div { width:100%; justify-content:flex-end; }
-  #settings .settings-install .install-dismiss { display:none!important; }
-  #settings .settings-install .button[disabled] { opacity:.55; cursor:not-allowed; }
-</style>
-
-<style>
-  .overview-insight b { color:#35b9b1!important; }
-  .metric,.panel,.chart-card,.year-timeline button,.year-table,.table-wrap,.history-entry,.todo-card,.utility-alert,.overview-insights,.today-todo-banner,.install-banner { box-shadow:0 1px 3px 0 rgba(0,0,0,.1); }
-  .spending-tabs { flex-basis:100%; justify-content:flex-end; }
-  .income-level-row .income-level-paycheck > span,.income-level-dates > label > span { display:none; }
-  .income-level-row .income-level-paycheck { min-width:0; }
-  .income-level-row .income-level-paycheck input,.income-level-row .income-level-dates input { width:100%; }
-  .income-level-row .income-level-dates { display:contents; }
-  @media (max-width:680px) {
-    .income-level-head { display:none!important; }
-    .income-level-row { display:grid!important; grid-template-columns:minmax(0,1fr) 42px!important; gap:8px!important; margin:0 0 16px!important; align-items:stretch!important; }
-    .income-level-row .income-level-paycheck { grid-column:1; grid-row:1; display:grid; gap:4px; }
-    .income-level-row .income-level-dates { grid-column:1; grid-row:2; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-    .income-level-row .income-level-paycheck > span,.income-level-dates > label > span { display:block; color:var(--muted); font-size:12px; font-weight:700; }
-    .income-level-dates > label { display:grid; gap:4px; min-width:0; }
-    .income-level-row .income-level-remove { grid-column:2!important; grid-row:1 / span 2!important; width:42px!important; height:auto!important; min-height:100%!important; align-self:stretch!important; }
-  }
-</style>
-
-<style>
-  #incomeHistory label { margin-top:0!important; }
-  @media (min-width:681px) {
-    .income-level-head,.income-level-row { grid-template-columns:132px 165px 165px 42px!important; gap:8px!important; }
-    .income-level-row { align-items:end!important; margin-bottom:8px!important; }
-    .income-level-row .income-level-paycheck { grid-column:1; grid-row:1; display:block!important; width:132px; }
-    .income-level-row .income-level-dates { display:contents!important; }
-    .income-level-row .income-level-dates > label { display:block; min-width:0; }
-    .income-level-row .income-level-remove { grid-column:4!important; grid-row:1!important; width:42px!important; height:42px!important; min-height:0!important; align-self:end!important; }
-  }
-</style>
-
-
-<style>
-  @media (max-width:680px) {
-    .app { padding:16px 16px 160px!important; padding-top:16px!important; }
-    .header-actions { padding-left:16px!important; padding-right:16px!important; }
-    .year-timeline { margin-left:-16px!important; margin-right:-16px!important; padding-left:16px!important; padding-right:16px!important; scroll-padding-inline:16px!important; }
-    #expenseDialog .dialog-inner { padding:16px 16px 0!important; }
-    #expenseDialog .dialog-inner > .toolbar.modal-actions { width:calc(100% + 32px)!important; margin:0 -16px!important; padding:16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))!important; }
-    .notes-dialog,.todo-edit-dialog,.expense-edit-dialog,.megan-reminder-dialog { width:calc(100vw - 32px)!important; }
-    .notes-dialog .dialog-inner,.todo-edit-dialog .dialog-inner,.expense-edit-dialog .dialog-inner,.megan-reminder-dialog .dialog-inner { padding:16px!important; }
-  }
-</style>
-
-<style>
-  .history-view-controls { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 16px; }
-  .history-view-tabs { display:flex; gap:6px; padding:4px; border:1px solid var(--line); border-radius:10px; background:var(--soft); }
-  .history-view-tab { min-height:38px; padding:7px 13px; border:0; border-radius:7px; background:transparent; color:var(--muted); font:inherit; font-weight:700; cursor:pointer; }
-  .history-view-tab.active { background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.12); }
-  .extra-income-value { color:#35b9b1!important; }
-  .history-legacy-label { color:var(--muted); font-size:13px; white-space:nowrap; }
-  .extra-income-dialog { width:min(540px,calc(100vw - 32px)); max-width:540px; padding:0; background:var(--surface); color:var(--ink); }
-  .extra-income-dialog .dialog-inner { padding:24px; }
-  .extra-income-dialog h2 { padding-right:42px; }
-  .extra-income-dialog .dialog-grid { margin:18px 0 22px; }
-  .extra-income-dialog label > span { display:block; margin-bottom:6px; color:var(--muted); font-weight:700; }
-  .extra-income-dialog input,.extra-income-dialog select { width:100%; min-height:48px; }
-  .extra-income-dialog textarea { width:100%; min-height:86px; resize:vertical; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); padding:10px; font:inherit; }
-  .extra-income-dialog label > span small { font-weight:500; }
-  .extra-income-categories { grid-template-columns:repeat(3,1fr); }
-  .notes-text-label { display:block; margin:0!important; }
-  .notes-text-label > span { display:block; margin:0 0 6px; color:var(--muted); font-weight:700; }
-  .notes-extra-income { margin:0 0 18px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--soft); }
-  .notes-extra-income .eyebrow { margin-bottom:8px; }
-  .notes-extra-income > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 16px; padding:7px 0; border-top:1px solid var(--line); }
-  .notes-extra-income > div:first-of-type { border-top:0; }
-  .notes-extra-income strong { color:#35b9b1; }
-  .notes-extra-income small { grid-column:1/-1; color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; }
-  @media(max-width:680px) {
-    .history-view-controls { align-items:stretch; flex-direction:column; }
-    .history-view-tabs { display:grid; grid-template-columns:1fr 1fr; }
-    .extra-income-dialog { position:fixed; inset:0; width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; border-radius:0; }
-    .extra-income-dialog .dialog-inner { min-height:100dvh; overflow:auto; padding:16px 16px 112px; }
-    .extra-income-dialog .toolbar.modal-actions { position:fixed; left:0; right:0; bottom:0; padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:var(--surface); }
-  }
-</style>
-
-<style>
-  .investment-page-heading { display:flex; justify-content:space-between; gap:20px; align-items:flex-end; margin:0 0 18px; }
-  .investment-page-heading h2 { font-size:26px; }
-  .investment-page-heading p:last-child { margin:5px 0 0; color:var(--muted); }
-  .investment-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-  .investment-summary-card,.investment-account-card { padding:18px; border:1px solid var(--line); border-radius:14px; background:var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.1); }
-  .investment-summary-card { display:grid; grid-template-columns:minmax(0,1fr) minmax(220px,42%); align-items:center; gap:20px; min-height:260px; }
-  .investment-summary-card h3 { margin:0 0 4px; font-size:18px; }
-  .investment-summary-card p,.investment-account-card p { color:var(--muted); }
-  .investment-summary-card p { margin:0; }
-  .investment-donut { position:relative; width:min(100%,230px); aspect-ratio:1; margin:auto; border-radius:50%; background:var(--investment-pie); }
-  .investment-donut::after { content:""; position:absolute; inset:17.5%; border-radius:50%; background:var(--surface); }
-  .investment-donut-total { position:absolute; z-index:1; inset:17.5%; display:flex; align-items:center; justify-content:center; padding:10px; text-align:center; font-size:22px; font-weight:700; letter-spacing:-.04em; }
-  .investment-legend { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin-top:20px; }
-  .investment-legend span { display:flex; align-items:center; gap:7px; min-width:0; color:var(--muted); font-size:13px; }
-  .investment-legend i { flex:0 0 9px; width:9px; height:9px; border-radius:50%; background:var(--legend-color); }
-  .investment-account-grid { display:grid; grid-template-columns:1fr; gap:14px; margin:14px 0; }
-  .investment-account-card h3 { margin:0; font-size:20px; }
-  .investment-account-heading { display:grid; gap:3px; }
-  .investment-account-type { color:var(--muted); font-size:13px; }
-  .investment-account-info { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:14px 28px; margin-bottom:18px; }
-  .investment-savings-card .investment-account-info { align-items:center; margin-bottom:0; }
-  .investment-savings-card .investment-account-stats { margin-left:auto; }
-  .investment-account-stats { display:flex; flex-wrap:wrap; gap:18px 28px; }
-  .investment-account-stat { display:grid; gap:3px; }
-  .investment-account-stat span { color:var(--muted); font-size:13px; }
-  .investment-account-stat strong { font-size:20px; }
-  .investment-account-stat.balance strong { font-size:28px; letter-spacing:-.035em; }
-  .investment-account-charts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-  .investment-account-charts.single { grid-template-columns:1fr; }
-  .investment-chart { min-width:0; padding:14px; border:1px solid var(--line); border-radius:10px; background:color-mix(in srgb,var(--surface) 90%,var(--soft)); }
-  .investment-chart h4 { margin:0; font-size:15px; }
-  .investment-chart p { margin:3px 0 10px; font-size:13px; }
-  .investment-chart svg { display:block; width:100%; height:180px; overflow:visible; }
-  .investment-chart-grid { stroke:var(--line); stroke-width:1; }
-  .investment-chart-axis { fill:var(--muted); font-size:11px; }
-  .investment-chart-empty { display:flex; align-items:center; justify-content:center; min-height:180px; color:var(--muted); text-align:center; }
-  .investment-progress { height:7px; overflow:hidden; margin-top:14px; border-radius:999px; background:var(--soft); }
-  .investment-progress i { display:block; height:100%; border-radius:inherit; background:#35b9b1; }
-  .investment-goal-label { display:flex; justify-content:space-between; gap:10px; margin-top:6px!important; font-size:12px!important; }
-  .investment-ledger { width:100%; margin-top:0; }
-  .investment-ledger > summary { list-style:none; cursor:pointer; }
-  .investment-ledger > summary::-webkit-details-marker { display:none; }
-  .investment-ledger > summary > span:first-child { display:flex; align-items:baseline; gap:10px; }
-  .investment-ledger > summary b { font-size:20px; }
-  .investment-ledger > summary small { color:var(--muted); }
-  .investment-ledger[open] > summary { margin-bottom:14px; }
-  .investment-disclosure { color:var(--muted); transition:transform .2s ease; }
-  .investment-ledger[open] .investment-disclosure { transform:rotate(180deg); }
-  .investment-settings { width:100%; margin-top:14px; }
-  .investment-settings > summary { min-height:42px; display:flex; align-items:center; justify-content:space-between; gap:16px; cursor:pointer; font-weight:700; }
-  .investment-settings[open] > summary { margin-bottom:8px; }
-  .investment-update-totals { flex:none; min-height:38px; }
-  .investment-settings-content > p { margin:0 0 10px; }
-  .investment-settings-row { display:grid; grid-template-columns:minmax(0,1fr) 140px 180px auto; gap:12px; align-items:end; padding:12px 0; border-top:1px solid var(--line); }
-  .investment-settings-row label { display:grid; gap:5px; color:var(--muted); font-size:13px; font-weight:700; }
-  .investment-settings-row input,.investment-settings-row select { width:100%; min-height:44px; }
-  .investment-settings-actions { display:flex; align-items:center; justify-content:flex-end; gap:4px; min-height:44px; }
-  .investment-settings-actions .investment-archive-button { color:#e66b68!important; }
-  .investment-settings-goal-spacer { min-height:44px; }
-  .investment-order-button { position:relative; display:block; flex:none; width:40px; height:40px; padding:0!important; color:var(--muted)!important; }
-  .investment-order-button svg { position:absolute; left:50%; top:50%; width:18px; height:18px; transform:translate(-50%,-50%); fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-  .investment-order-button:disabled { opacity:.28; cursor:default; }
-  .investment-add-account { margin-top:12px; }
-  .investment-archived-heading { margin:18px 0 0; color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.08em; }
-  .investment-settings-row.is-archived { opacity:.72; }
-  .investment-settings-row.is-archived .investment-settings-actions button { color:var(--muted)!important; }
-  .investment-total-fields { display:grid; gap:12px; margin:18px 0 22px; }
-  .investment-total-fields label { display:grid; grid-template-columns:minmax(0,1fr) minmax(150px,210px); align-items:center; gap:16px; color:var(--muted); font-weight:700; }
-  .investment-total-fields label span { display:grid; gap:2px; }
-  .investment-total-fields label small { color:var(--muted); font-weight:500; }
-  .investment-total-fields input { width:100%; min-height:48px; }
-  .investment-dialog { width:min(600px,calc(100vw - 32px)); max-width:600px; padding:0; background:var(--surface); color:var(--ink); }
-  .investment-dialog .dialog-inner { padding:24px; }
-  .investment-dialog h2 { padding-right:42px; }
-  .investment-dialog .dialog-grid { margin:18px 0 22px; }
-  .investment-dialog label > span { display:block; margin-bottom:6px; color:var(--muted); font-weight:700; }
-  .investment-dialog label > span small { font-weight:500; }
-  .investment-dialog input { width:100%; min-height:48px; }
-  .investment-dialog textarea { width:100%; min-height:80px; resize:vertical; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); padding:10px; font:inherit; }
-  .investment-account-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .investment-entry .history-kind span { color:var(--muted); }
-  @media(max-width:900px) {
-    .investment-settings-row { grid-template-columns:minmax(0,1fr) 130px 160px auto; }
-    .main-nav .nav-tab { padding-left:8px!important; padding-right:8px!important; }
-  }
-  @media(max-width:680px) {
-    .main-nav { grid-template-columns:repeat(5,1fr)!important; }
-    .main-nav .nav-tab { font-size:11px!important; padding-left:2px!important; padding-right:2px!important; }
-    .investment-summary { grid-template-columns:1fr; gap:10px; }
-    .investment-summary-card { grid-template-columns:1fr; min-height:0; }
-    .investment-account-grid { gap:10px; }
-    .investment-summary-card,.investment-account-card { padding:14px; }
-    .investment-donut { width:min(100%,210px); }
-    .investment-account-charts { grid-template-columns:1fr; }
-    .investment-account-stats { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    .investment-chart svg { height:170px; }
-    .investment-settings-row { grid-template-columns:1fr 1fr; gap:8px; }
-    .investment-settings-row > label:first-child { grid-column:1/-1; }
-    .investment-settings-goal-spacer { display:none; }
-    .investment-settings-actions { grid-column:1/-1; }
-    .investment-settings-actions .investment-archive-button { flex:1; }
-    .investment-savings-card .investment-account-stats { width:auto; margin-left:auto; display:flex; }
-    .investment-settings > summary { gap:8px; }
-    .investment-total-fields label { grid-template-columns:1fr; gap:6px; }
-    .investment-dialog { position:fixed; inset:0; width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; border-radius:0; }
-    .investment-dialog .dialog-inner { min-height:100dvh; overflow:auto; padding:16px 16px 112px; }
-    .investment-dialog .toolbar.modal-actions { position:fixed; left:0; right:0; bottom:0; padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:var(--surface); }
-    .investment-account-options { grid-template-columns:1fr 1fr; }
-  }
-</style>
-
-<style>
-  .monthly-table tr.current-month-row > th,
-  .monthly-table tr.current-month-row > td { background:#183b38!important; border-top-color:#2caaa1!important; border-bottom-color:#2caaa1!important; }
-  :root[data-theme="light"] .monthly-table tr.current-month-row > th,
-  :root[data-theme="light"] .monthly-table tr.current-month-row > td { background:#e2f3f0!important; border-top-color:#35a89f!important; border-bottom-color:#35a89f!important; }
-</style>
-
-<style>
-  .accounts-group { margin-top:24px; }
-  .accounts-group:first-child { margin-top:0; }
-  .accounts-group-head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:12px; }
-  .accounts-group-head h3 { margin:0; font-size:21px; }
-  .accounts-group-head span { color:var(--muted); }
-  .accounts-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
-  .account-card { overflow:hidden; border:1px solid var(--line); border-radius:14px; background:var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.1); }
-  .account-card-art { position:relative; display:grid; place-items:center; width:100%; aspect-ratio:1.586/1; overflow:hidden; background:var(--soft); }
-  .account-card-art::after { content:''; position:absolute; z-index:1; left:0; right:0; bottom:0; height:1px; background:rgba(0,0,0,.15); pointer-events:none; }
-  .account-card-art img { display:block; width:100%; height:100%; object-fit:contain; }
-  .account-placeholder { display:grid; place-items:center; width:100%; height:100%; color:var(--muted); background:linear-gradient(145deg,var(--soft),color-mix(in srgb,var(--soft) 70%,var(--green))); }
-  .account-placeholder svg { width:44px; height:44px; opacity:.8; }
-  .account-card-body { padding:12px 14px 13px; }
-  .account-card-title { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-  .account-card-title h4 { margin:0; font-size:19px; }
-  .account-card-copy { margin-top:9px; }
-  .account-card-use { margin:6px 0 0; color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; }
-  .account-card-copy small { display:block; margin-bottom:2px; color:var(--muted); }
-  .account-card-copy p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
-  .account-card-actions { position:absolute; z-index:2; top:9px; right:9px; display:flex; gap:7px; opacity:0; pointer-events:none; transform:translateY(-3px); transition:opacity .14s ease,transform .14s ease; }
-  .account-card:hover .account-card-actions,.account-card:focus-within .account-card-actions { opacity:1; pointer-events:auto; transform:translateY(0); }
-  .account-card-action { display:grid; place-items:center; width:36px; height:36px; padding:0; border:1px solid rgba(255,255,255,.25); border-radius:8px; background:rgba(3,27,34,.82); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.22); cursor:pointer; backdrop-filter:blur(5px); }
-  .account-card-action svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
-  .account-card-action:hover,.account-card-action:focus-visible { background:rgba(3,27,34,.96); outline:2px solid var(--orange); outline-offset:2px; }
-  .account-card-action.account-delete:hover,.account-card-action.account-delete:focus-visible { color:#ff8c88; }
-  @media(hover:none),(pointer:coarse) {
-    .account-card-actions { opacity:1; pointer-events:auto; transform:none; }
-  }
-  .accounts-closed { margin-top:14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
-  .accounts-closed > summary { padding:13px 15px; cursor:pointer; color:var(--muted); }
-  .accounts-closed[open] > summary { border-bottom:1px solid var(--line); }
-  .accounts-closed .accounts-grid { padding:14px; }
-  .accounts-empty { display:grid; place-items:center; min-height:150px; padding:20px; border:1px dashed var(--line); border-radius:14px; color:var(--muted); text-align:center; }
-  .account-dialog { width:min(640px,calc(100vw - 32px)); max-width:640px; padding:0; background:var(--surface); color:var(--ink); }
-  .account-dialog .dialog-inner { padding:24px; }
-  .account-dialog h2 { padding-right:42px; }
-  .account-dialog .dialog-grid { margin:18px 0 22px; }
-  .account-dialog label > span { display:block; margin-bottom:6px; color:var(--muted); font-weight:700; }
-  .account-dialog input,.account-dialog select { width:100%; min-height:48px; }
-  .account-dialog textarea { width:100%; min-height:82px; resize:vertical; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--ink); padding:10px; font:inherit; }
-  .account-kind-options { grid-template-columns:1fr 1fr; }
-  .account-image-editor { display:grid; grid-template-columns:minmax(220px,1fr) minmax(170px,.7fr); gap:16px; align-items:center; margin:18px 0; }
-  .account-image-preview { display:grid; place-items:center; aspect-ratio:1.586/1; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--soft); }
-  .account-image-preview img { width:100%; height:100%; object-fit:contain; }
-  .account-image-actions { display:grid; gap:8px; }
-  .account-image-actions .button { text-align:center; }
-  .account-upload-button { position:relative; display:grid; place-items:center; cursor:pointer; }
-  .account-upload-button input { position:absolute; width:1px!important; height:1px!important; min-height:0!important; opacity:0; pointer-events:none; }
-  .account-image-actions p { margin:2px 0 0; }
-  @media(max-width:900px) {
-    .accounts-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  }
-  @media(max-width:680px) {
-    .main-nav { grid-template-columns:repeat(6,1fr)!important; }
-    .main-nav .nav-tab { min-width:0; padding:6px 2px!important; }
-    .main-nav .nav-label { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
-    .main-nav .nav-icon,.main-nav .nav-icon svg { width:27px!important; height:27px!important; font-size:27px!important; }
-    .main-nav .nav-tab.active:before { left:18%!important; right:18%!important; }
-    .accounts-grid { grid-template-columns:1fr; }
-    .account-image-editor { grid-template-columns:1fr; }
-    .account-dialog { position:fixed; inset:0; width:100vw; max-width:none; height:100dvh; max-height:none; margin:0; border-radius:0; }
-    .account-dialog .dialog-inner { min-height:100dvh; overflow:auto; padding:16px 16px 112px; }
-    .account-dialog .toolbar.modal-actions { position:fixed; left:0; right:0; bottom:0; padding:16px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:var(--surface); }
-  }
-</style>
-
-
-  <script src="app.js"></script>
-  <script type="module" src="firebase-init.js"></script>
-</body></html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'none'; object-src 'none'; script-src 'self' https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com wss://*.googleapis.com https://apis.google.com https://accounts.google.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; form-action 'self'; manifest-src 'self'; upgrade-insecure-requests"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#0a1e20" />
+    <meta name="application-name" content="Estuary" />
+    <meta name="apple-mobile-web-app-title" content="Estuary" />
+    <link rel="manifest" href="manifest.webmanifest?v=estuary-10" />
+    <link rel="icon" href="app-icon.png?v=10" type="image/png" />
+    <link rel="apple-touch-icon" href="app-icon.png?v=10" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>Estuary</title>
+    <meta name="estuary-release" content="112" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="auth-locked">
+    <main class="app">
+      <aside id="installBanner" class="install-banner hidden" aria-label="Install Estuary">
+        <span>Install Estuary for faster access.</span>
+        <div>
+          <button class="button primary" id="installApp">Install</button
+          ><button class="install-dismiss" id="dismissInstall" aria-label="Dismiss install prompt">×</button>
+        </div>
+      </aside>
+      <header class="top-header">
+        <div><h1>Budget</h1></div>
+        <nav class="main-nav" aria-label="Primary navigation">
+          <button class="nav-tab tab active" data-tab="overview" aria-label="Overview" title="Overview">
+            <span class="nav-icon">⌂</span><span class="nav-label">Overview</span></button
+          ><button class="nav-tab tab" data-tab="months" aria-label="Months" title="Months">
+            <span class="nav-icon">▦</span><span class="nav-label">Months</span></button
+          ><button class="nav-tab tab" data-tab="history" aria-label="History" title="History">
+            <span class="nav-icon">☷</span><span class="nav-label">History</span></button
+          ><button class="nav-tab tab" data-tab="investments" aria-label="Investments" title="Investments">
+            <span class="nav-icon"
+              ><svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M4 18 9 13l3 3 7-9M15 7h4v4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                /></svg></span
+            ><span class="nav-label">Investments</span></button
+          ><button class="nav-tab tab" data-tab="accounts" aria-label="Accounts" title="Accounts">
+            <span class="nav-icon"
+              ><svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1H2Zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7Z"
+                  fill="currentColor"
+                />
+                <path
+                  d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1Z"
+                  fill="currentColor"
+                /></svg></span
+            ><span class="nav-label">Accounts</span></button
+          ><button class="nav-tab tab" data-tab="settings" aria-label="Settings" title="Settings">
+            <span class="nav-icon">⚙</span><span class="nav-label">Settings</span>
+          </button>
+        </nav>
+        <div class="header-actions">
+          <button class="hidden" id="themeToggle">Light mode</button
+          ><button class="button primary" id="addExpense">+ Add expense</button>
+        </div>
+      </header>
+      <p class="notice hidden" id="notice" aria-live="polite"></p>
+      <section id="overview">
+        <select class="hidden" id="monthPicker"></select>
+        <aside id="utilityAlert" class="utility-alert hidden" role="status" aria-live="polite"></aside>
+        <div class="metrics overview-metrics" id="metrics"></div>
+        <section class="charts" id="chartArea"></section>
+      </section>
+      <section id="months" class="hidden">
+        <div class="year-timeline" id="yearTimeline"></div>
+        <div class="year-table" id="monthlyYearTable"></div>
+      </section>
+      <section id="history" class="hidden">
+        <div class="history-head">
+          <h2>Expense history</h2>
+          <span id="historyCount"></span>
+        </div>
+        <div class="history-list" id="historyEntries"></div>
+      </section>
+      <section id="investments" class="hidden">
+        <div class="investment-page-heading">
+          <div>
+            <p class="eyebrow">INVESTMENTS</p>
+            <h2>Portfolio</h2>
+            <p>Track contributions separately from market gains and losses.</p>
+          </div>
+        </div>
+        <div class="investment-summary" id="investmentSummary"></div>
+        <div class="investment-account-grid" id="investmentAccountGrid"></div>
+        <details class="panel investment-ledger">
+          <summary class="history-head">
+            <span><b>Contribution history</b><small id="investmentCount"></small></span
+            ><span class="investment-disclosure" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="history-list" id="investmentEntries"></div>
+        </details>
+        <details class="panel investment-settings">
+          <summary>
+            <span>Investment settings</span
+            ><button type="button" class="button ghost investment-update-totals" id="updateInvestmentTotals">
+              Update totals
+            </button>
+          </summary>
+          <div class="investment-settings-content">
+            <p class="small">Add accounts, set yearly goals, and configure automatic 401(k) contributions.</p>
+            <div id="investmentAccountSettings"></div>
+            <button type="button" class="button ghost investment-add-account" id="addInvestmentAccount">
+              + Add account
+            </button>
+          </div>
+        </details>
+      </section>
+      <section id="accounts" class="hidden"><div id="accountsContent"></div></section>
+      <section id="settings" class="hidden">
+        <div class="grid">
+          <article class="panel settings">
+            <p class="eyebrow">STATIC VALUES</p>
+            <h2>Budget settings</h2>
+            <p class="small">These values sync privately between your signed-in devices.</p>
+            <label>Monthly income<input type="number" data-setting="monthlyIncome" /></label
+            ><label>Fixed monthly expenses<input type="number" data-setting="fixedExpenses" /></label
+            ><label>Kevin mortgage<input type="number" data-setting="kevinMortgage" /></label
+            ><label>Kevin grocery share (%)<input type="number" step="0.1" data-setting="foodShare" /></label
+            ><label>R value 1 for Megan<input type="number" data-setting="meganR1" /></label
+            ><label>R value 2 for Megan<input type="number" data-setting="meganR2" /></label>
+            <p class="small">Megan owes = her grocery share + these two R values.</p>
+          </article>
+          <article class="panel settings">
+            <p class="eyebrow">FIREBASE SYNC</p>
+            <h2>Your private budget</h2>
+            <p class="small">
+              Sign in with the same Google account on each device. Your budget stays private and syncs
+              automatically.
+            </p>
+            <div class="toolbar" style="margin-top: 18px">
+              <button class="button" id="firebaseSignIn">Sign in with Google</button
+              ><button class="button ghost" id="firebaseSignOut">Sign out</button>
+            </div>
+            <p class="small" id="firebaseStatus" style="margin-top: 14px">Connecting to Firebase…</p>
+          </article>
+        </div>
+      </section>
+    </main>
+    <dialog id="expenseDialog">
+      <div class="dialog-inner">
+        <button class="dialog-close" id="closeExpense" aria-label="Close add expense dialog">×</button>
+        <h2>Add an expense</h2>
+        <p class="small">The discounted amount is added to the matching monthly total.</p>
+        <div class="dialog-grid">
+          <label>Amount<input id="expenseAmount" inputmode="decimal" placeholder="0.00" autofocus /></label
+          ><label class="full-row"
+            >Type<input id="expenseType" type="hidden" value="Spending" />
+            <div class="option-grid" id="typeOptions">
+              <button type="button" class="choice-option selected" data-expense-type="Spending">
+                Spending</button
+              ><button type="button" class="choice-option" data-expense-type="Water">Water</button
+              ><button type="button" class="choice-option" data-expense-type="Electricity">Electricity</button
+              ><button type="button" class="choice-option" data-expense-type="Gas">Gas</button
+              ><button type="button" class="choice-option" data-expense-type="Groceries">Groceries</button>
+            </div></label
+          ><label class="full-row"
+            >CC modifier<input id="expenseModifier" type="hidden" value="0.95" />
+            <div class="option-grid modifier-grid" id="modifierOptions">
+              <button type="button" class="choice-option" data-expense-modifier="0.90">0.90</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.91">0.91</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.92">0.92</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.93">0.93</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.94">0.94</button
+              ><button type="button" class="choice-option selected" data-expense-modifier="0.95">0.95</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.96">0.96</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.97">0.97</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.98">0.98</button
+              ><button type="button" class="choice-option" data-expense-modifier="0.99">0.99</button
+              ><button type="button" class="choice-option" data-expense-modifier="1.00">1.00</button>
+            </div></label
+          ><label>Month<select id="expenseMonth"></select></label
+          ><label class="full-row" id="commentField"
+            >Comment<textarea id="expenseComment" placeholder="What was this for?"></textarea>
+          </label>
+        </div>
+        <div class="final"><span>Final amount</span><strong id="finalAmount">$0.00</strong></div>
+        <div class="toolbar modal-actions">
+          <button class="button ghost" id="cancelExpense">Cancel</button
+          ><button class="button primary" id="saveExpense">Add expense</button>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="extraIncomeDialog" class="extra-income-dialog">
+      <form class="dialog-inner" id="extraIncomeForm">
+        <button
+          type="button"
+          class="dialog-close"
+          id="closeExtraIncome"
+          aria-label="Close extra income dialog"
+        >
+          ×
+        </button>
+        <h2 id="extraIncomeDialogTitle">Add extra income</h2>
+        <p class="small" id="extraIncomeDialogDescription">
+          This amount will be subtracted from Spending for the selected month.
+        </p>
+        <div class="dialog-grid">
+          <label class="extra-income-amount"
+            ><span>Amount</span
+            ><input
+              id="extraIncomeAmount"
+              inputmode="decimal"
+              placeholder="0.00"
+              aria-label="Amount"
+              required /></label
+          ><label
+            ><span>Month</span
+            ><select id="extraIncomeMonth" aria-label="Month"></select></label
+          ><label class="full-row"
+            ><span>Category</span>
+            <div class="option-grid extra-income-categories" id="extraIncomeCategories">
+              <button type="button" class="choice-option selected" data-extra-income-category="Signup Bonus">
+                Signup Bonus</button
+              ><button type="button" class="choice-option" data-extra-income-category="Gift">Gift</button
+              ><button type="button" class="choice-option" data-extra-income-category="Misc">Misc</button>
+            </div>
+            <input id="extraIncomeCategory" type="hidden" value="Signup Bonus" /></label
+          ><label class="full-row"
+            ><span>Description <small>(optional)</small></span
+            ><textarea
+              id="extraIncomeDescription"
+              maxlength="300"
+              placeholder="Where did this come from?"
+            ></textarea>
+          </label>
+        </div>
+        <div class="toolbar modal-actions">
+          <button type="button" class="button ghost" id="cancelExtraIncome">Cancel</button
+          ><button type="submit" class="button primary" id="saveExtraIncome">Add extra income</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="investmentDialog" class="investment-dialog">
+      <form class="dialog-inner" id="investmentForm">
+        <button type="button" class="dialog-close" id="closeInvestment" aria-label="Close investment dialog">
+          ×
+        </button>
+        <h2 id="investmentDialogTitle">Add investment</h2>
+        <div class="dialog-grid">
+          <label class="investment-amount"
+            ><span>Contribution amount</span
+            ><input
+              id="investmentAmount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              inputmode="decimal"
+              placeholder="0.00"
+              aria-label="Contribution amount"
+              required /></label
+          ><label
+            ><span>Date</span
+            ><input id="investmentDate" type="date" aria-label="Contribution date" required /></label
+          ><label class="full-row"
+            ><span>Account</span>
+            <div class="option-grid investment-account-options" id="investmentAccountOptions"></div>
+            <input id="investmentAccount" type="hidden" /></label
+          ><label class="full-row"
+            ><span>Description <small>(optional)</small></span
+            ><textarea id="investmentDescription" maxlength="300" placeholder="Add a note"></textarea>
+          </label>
+        </div>
+        <div class="toolbar modal-actions">
+          <button type="button" class="button ghost" id="cancelInvestment">Cancel</button
+          ><button type="submit" class="button primary" id="saveInvestment">Add investment</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="investmentTotalsDialog" class="investment-dialog investment-totals-dialog">
+      <form class="dialog-inner" id="investmentTotalsForm">
+        <button
+          type="button"
+          class="dialog-close"
+          id="closeInvestmentTotals"
+          aria-label="Close totals dialog"
+        >
+          ×
+        </button>
+        <h2>Update totals</h2>
+        <p class="small">
+          Enter each account’s current value. Leaving a field blank keeps its last known value.
+        </p>
+        <div class="investment-total-fields" id="investmentTotalFields"></div>
+        <div class="toolbar modal-actions">
+          <button type="button" class="button ghost" id="cancelInvestmentTotals">Cancel</button
+          ><button type="submit" class="button primary">Save totals</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="investmentAccountDialog" class="investment-dialog">
+      <form class="dialog-inner" id="investmentAccountForm">
+        <button
+          type="button"
+          class="dialog-close"
+          id="closeInvestmentAccount"
+          aria-label="Close account dialog"
+        >
+          ×
+        </button>
+        <h2>Add investment account</h2>
+        <div class="dialog-grid">
+          <label class="full-row"
+            ><span>Account name</span
+            ><input id="newInvestmentAccountName" type="text" maxlength="60" required /></label
+          ><label class="full-row"
+            ><span>Type</span
+            ><select id="newInvestmentAccountType">
+              <option>IRA</option>
+              <option>401k</option>
+              <option>Brokerage</option>
+              <option>Savings</option>
+            </select></label
+          >
+        </div>
+        <div class="toolbar modal-actions">
+          <button type="button" class="button ghost" id="cancelInvestmentAccount">Cancel</button
+          ><button type="submit" class="button primary">Add account</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="accountDialog" class="account-dialog">
+      <form class="dialog-inner" id="accountForm">
+        <button type="button" class="dialog-close" id="closeAccount" aria-label="Close account dialog">
+          ×
+        </button>
+        <h2 id="accountDialogTitle">Add account</h2>
+        <div class="account-image-editor">
+          <div
+            class="account-image-preview"
+            id="accountImagePreview"
+            aria-label="Account artwork preview"
+          ></div>
+          <div class="account-image-actions">
+            <label class="button ghost account-upload-button"
+              >Upload SVG<input id="accountImageFile" type="file" accept="image/svg+xml,.svg" /></label
+            ><button type="button" class="button ghost" id="removeAccountImage">Remove image</button>
+            <p class="small" id="accountImageStatus">SVG only · maximum 100 KB</p>
+          </div>
+        </div>
+        <div class="dialog-grid">
+          <label class="full-row"><span>Name</span><input id="accountName" maxlength="80" required /></label
+          ><label class="full-row"
+            ><span>Type</span>
+            <div class="option-grid account-kind-options">
+              <button type="button" class="choice-option selected" data-account-kind="Credit Card">
+                Credit Card</button
+              ><button type="button" class="choice-option" data-account-kind="Bank Account">
+                Bank Account
+              </button>
+            </div>
+            <input id="accountKind" type="hidden" value="Credit Card" /></label
+          ><label class="full-row"
+            ><span>Use</span
+            ><textarea
+              id="accountUse"
+              maxlength="500"
+              placeholder="What do you use this account for?"
+            ></textarea></label
+          ><label class="full-row"
+            ><span>Signup bonus notes</span
+            ><textarea
+              id="accountSignupBonus"
+              maxlength="1000"
+              placeholder="Bonus amount, spending requirement, deadline, or progress"
+            ></textarea></label
+          ><label class="full-row"
+            ><span>Status</span
+            ><select id="accountStatus">
+              <option>Active</option>
+              <option>Closed</option>
+            </select></label
+          >
+        </div>
+        <div class="toolbar modal-actions">
+          <button type="button" class="button ghost" id="cancelAccount">Cancel</button
+          ><button type="submit" class="button primary" id="saveAccount">Add account</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="notesDialog" class="notes-dialog">
+      <div class="dialog-inner">
+        <button class="dialog-close" id="closeNotes" aria-label="Close notes">×</button>
+        <h2 id="notesTitle">Monthly notes</h2>
+        <section
+          id="notesExtraIncome"
+          class="notes-extra-income hidden"
+          aria-label="Extra income for this month"
+        ></section>
+        <label class="notes-text-label"
+          ><span>Notes</span
+          ><textarea id="notesText" maxlength="500" placeholder="Add notes for this month"></textarea>
+        </label>
+        <div class="notes-meta"><span id="notesCount">0 / 500</span></div>
+        <div class="toolbar">
+          <button class="button ghost" id="cancelNotes">Cancel</button
+          ><button class="button primary" id="saveNotes">Save notes</button>
+        </div>
+      </div>
+    </dialog>
+    <script src="app.js"></script>
+    <script type="module" src="firebase-init.js"></script>
+  </body>
+</html>
