@@ -1,6 +1,22 @@
 import { initializeApp } from './vendor/firebase/12.18.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from './vendor/firebase/12.18.0/firebase-auth.js';
-import { getFirestore, doc, collection, getDoc, getDocs, onSnapshot, runTransaction, setDoc, deleteDoc } from './vendor/firebase/12.18.0/firebase-firestore.js';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+} from './vendor/firebase/12.18.0/firebase-auth.js';
+import {
+  getFirestore,
+  doc,
+  collection,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  runTransaction,
+  setDoc,
+  deleteDoc,
+} from './vendor/firebase/12.18.0/firebase-firestore.js';
 
 window.EstuaryFirebase = {
   create: config => {
@@ -19,9 +35,9 @@ window.EstuaryFirebase = {
       GoogleAuthProvider,
       onAuthStateChanged,
       signInWithPopup,
-      signOut
+      signOut,
     };
-  }
+  },
 };
 
 window.dispatchEvent(new Event('firebase-sdk-ready'));
