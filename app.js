@@ -1031,7 +1031,10 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(monthsRef, snapshot => {
-      if (!snapshot.empty) {
+      // A snapshot that is both empty and only from the local cache means Firestore hasn't heard
+      // back from the server yet for this collection, not that it's actually empty; applying it
+      // would wipe out real data with nothing (see accounts/entries/etc. below for the same guard).
+      if (!(snapshot.empty && snapshot.metadata.fromCache)) {
         const merged = new Map(data.months.map(month => [month.id, month]));
         snapshot.docs.forEach(record => {
           const remote = normalizeMonthRecord(record.data(), record.id);
@@ -1050,6 +1053,9 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(entriesRef, snapshot => {
+      // Skip an empty snapshot that only reflects "nothing cached yet" rather than a confirmed
+      // empty collection, so a slow or briefly offline connection can't wipe real expenses.
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       data.entries = snapshot.docs
         .map(record => normalizeExpenseRecord(record.data(), record.id))
         .filter(Boolean)
@@ -1060,6 +1066,7 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(extraIncomeRef, snapshot => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       data.extraIncome = snapshot.docs
         .map(record => normalizeExtraIncomeRecord(record.data(), record.id))
         .filter(Boolean)
@@ -1070,6 +1077,7 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(investmentsRef, snapshot => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       const migrated = [];
       data.investments = snapshot.docs
         .map(record => {
@@ -1100,7 +1108,7 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(investmentBalancesRef, snapshot => {
-      if (!snapshot.empty)
+      if (!(snapshot.empty && snapshot.metadata.fromCache))
         data.investmentBalances = snapshot.docs
           .map(record => normalizeInvestmentBalanceRecord(record.data(), record.id))
           .filter(Boolean)
@@ -1111,6 +1119,11 @@ function subscribeFirebase() {
   );
   firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(accountsRef, snapshot => {
+      // Same guard as above: an empty snapshot that's only from the local cache means Firestore
+      // hasn't confirmed this collection's contents with the server yet, not that it's empty.
+      // Without this, a slow connection or brief reconnect right after adding an account could
+      // wipe it from both memory and localStorage before its write was ever seen.
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
       data.accounts = snapshot.docs
         .map(record => normalizeAccountRecord(record.data(), record.id))
         .filter(Boolean)
