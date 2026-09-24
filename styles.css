@@ -2425,6 +2425,22 @@ dialog,
 .monthly-table td.utility-missing {
   background: color-mix(in srgb, #dca62f 18%, transparent) !important;
 }
+.monthly-table input.utility-input {
+  width: 76px !important;
+  color: inherit;
+  text-align: right;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.monthly-table input.utility-input::-webkit-inner-spin-button,
+.monthly-table input.utility-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.monthly-table td.utility-missing input.utility-input {
+  border-color: #dca62f;
+  box-shadow: 0 0 0 1px #dca62f55;
+}
 @media (max-width: 680px) {
   .utility-alert {
     padding: 8px 16px;
@@ -3249,7 +3265,13 @@ body:not(.auth-locked) #authGate {
   cursor: not-allowed;
 }
 .overview-insight b {
-  color: #35b9b1 !important;
+  color: inherit;
+}
+.overview-insight b.good {
+  color: var(--good);
+}
+.overview-insight b.bad {
+  color: var(--bad);
 }
 .metric,
 .panel,
@@ -4429,4 +4451,138 @@ body:not(.auth-locked) #authGate {
     border-top: 1px solid var(--line);
     background: var(--surface);
   }
+}
+
+/* Good/bad news colours: green only ever means good. */
+:root {
+  --good: #35b9b1;
+  --bad: #f0845c;
+}
+:root[data-theme='light'] {
+  --good: #137a6e;
+  --bad: #c2502c;
+}
+
+/* History: month groups, filters and rows */
+.history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.history-filters .history-filter {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+}
+.history-filters select {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 40px;
+}
+.history-group {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.history-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.history-group-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.history-group-head span {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.history-group-head span b {
+  color: var(--ink);
+}
+.history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.history-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.history-row-main b {
+  font-size: 15px;
+}
+.history-row-comment {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.history-row-main time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.history-row-amount {
+  color: var(--ink);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.history-row-amount.income {
+  color: var(--good);
+}
+.history-row .history-actions {
+  grid-column: auto;
+  margin: 0;
+  gap: 2px;
+}
+.history-more {
+  width: 100%;
+  margin-top: 8px;
+}
+@media (max-width: 450px) {
+  .history-row {
+    gap: 8px;
+    padding-left: 12px;
+  }
+  .history-row .history-icon-button {
+    width: 34px;
+    height: 34px;
+  }
+}
+@media (max-width: 680px) {
+  .history-filters .history-filter {
+    flex-basis: 100%;
+  }
+  .history-filters select {
+    flex: 1 1 0;
+  }
+}
+
+/* Investments: market gain */
+.investment-account-stat strong.good,
+.investment-gain-summary b.good {
+  color: var(--good);
+}
+.investment-account-stat strong.bad,
+.investment-gain-summary b.bad {
+  color: var(--bad);
+}
+.investment-account-stat.gain strong small {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.investment-summary-card .investment-gain-summary {
+  margin-top: 6px;
+  font-size: 14px;
 }

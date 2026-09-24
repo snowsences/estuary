@@ -35,6 +35,9 @@ const key = localKeys.data,
   num = x => (Number.isFinite(Number(x)) ? round(x) : 0);
 let displayMode = localStorage.getItem(localKeys.displayMode) === 'on',
   historyFilter = '',
+  historyKind = '',
+  historyMonth = '',
+  historyMonthsShown = 3,
   money = n => {
     const value = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -496,6 +499,9 @@ data.months.sort((a, b) => a.id.localeCompare(b.id));
 let active = data.months.find(month => month.id.startsWith(String(currentYear)))?.id || data.months.at(-1).id,
   selectedYear = String(currentYear);
 const save = () => localStorage.setItem(key, JSON.stringify(data));
+
+// Emphasise a figure in prose as good (green) or bad (warm) news; plain <b> stays neutral.
+const tone = (html, good) => `<b class="${good ? 'good' : 'bad'}">${html}</b>`;
 
 // render() redraws the app from `data`. Each feature hooks into it rather than wrapping it:
 // - beforeRender(step) runs before drawing, newest step first; a step returning false skips the render.
@@ -1535,7 +1541,7 @@ function monthTable(months) {
     .map(month => {
       const values = total(month),
         label = `${monthLabels[Number(month.id.slice(5, 7)) - 1].slice(0, 3)} '${month.id.slice(2, 4)}`;
-      return `<tr data-month="${month.id}"><th>${label}</th><td class="saved ${savedTone(values.saved)} ${values.savedLocked ? 'saved-locked' : ''}" ${values.savedLocked ? `title="Saved was locked on ${new Date(month.savedLockedAt).toLocaleDateString()}"` : ''}>${money(values.saved)}</td><td><div class="spending-cell"><span class="month-value">${money(month.spending)}</span><button class="notes-button ${month.notes ? 'has-notes' : ''}" data-notes-month="${month.id}" aria-label="Edit notes for ${month.label}" title="${month.notes ? 'Edit notes' : 'Add notes'}">▤</button></div></td><td class="month-value">${money(month.groceries)}</td>${['water', 'electricity', 'gas'].map(key => `<td class="month-value ${utilityValueMissing(month, key) ? 'utility-missing' : ''}">${money(month[key])}</td>`).join('')}<td class="megan">${money(values.megan)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${month.id}">Add cash offset</button></div></details></td></tr>`;
+      return `<tr data-month="${month.id}"><th>${label}</th><td class="saved ${savedTone(values.saved)} ${values.savedLocked ? 'saved-locked' : ''}" ${values.savedLocked ? `title="Saved was locked on ${new Date(month.savedLockedAt).toLocaleDateString()}"` : ''}>${money(values.saved)}</td><td><div class="spending-cell"><span class="month-value">${money(month.spending)}</span><button class="notes-button ${month.notes ? 'has-notes' : ''}" data-notes-month="${month.id}" aria-label="Edit notes for ${month.label}" title="${month.notes ? 'Edit notes' : 'Add notes'}">▤</button></div></td><td class="month-value">${money(month.groceries)}</td>${['water', 'electricity', 'gas'].map(key => `<td class="${utilityValueMissing(month, key) ? 'utility-missing' : ''}"><input class="utility-input" type="number" inputmode="decimal" min="0" step="0.01" data-month="${month.id}" data-key="${key}" value="${round(month[key]).toFixed(2)}" aria-label="${key[0].toUpperCase() + key.slice(1)} for ${month.label}"></td>`).join('')}<td class="megan">${money(values.megan)}</td><td class="actions"><details><summary aria-label="More actions">•••</summary><div class="action-menu"><button data-offset-month="${month.id}">Add cash offset</button></div></details></td></tr>`;
     })
     .join('')}</tbody></table></div>`;
 }
@@ -1853,49 +1859,105 @@ requestAnimationFrame(updateChartControlsSticky);
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+// History lists entries grouped by the budget month they count toward, newest months first.
+function expenseKind(entry) {
+  if (['Water', 'Electricity', 'Gas'].includes(entry.type)) return 'Bills';
+  if (entry.type === 'Groceries') return 'Groceries';
+  return entry.category === 'Dining' ? 'Dining' : 'Shopping';
+}
+function expenseLabel(entry) {
+  const kind = expenseKind(entry);
+  if (kind === 'Bills') return entry.type;
+  if (kind === 'Shopping' && entry.subcategory) return `Shopping · ${entry.subcategory}`;
+  return kind === 'Shopping' && !entry.category ? 'Spending' : kind;
+}
 function setupHistoryFilter() {
   const history = document.getElementById('history'),
     entries = document.getElementById('historyEntries');
-  if (!history || document.getElementById('historyFilter')) return;
-  const input = document.createElement('input');
-  input.id = 'historyFilter';
-  input.className = 'history-filter';
-  input.type = 'search';
-  input.placeholder = 'Filter comments';
-  input.setAttribute('aria-label', 'Filter expense comments');
-  input.addEventListener('input', () => {
-    historyFilter = input.value.trim().toLowerCase();
+  if (!history || document.getElementById('historyFilters')) return;
+  const bar = document.createElement('div');
+  bar.id = 'historyFilters';
+  bar.className = 'history-filters';
+  bar.innerHTML = `<input id="historyFilter" class="history-filter" type="search" placeholder="Search comments" aria-label="Search expense comments"><select id="historyKindFilter" aria-label="Filter by type"><option value="">All types</option>${['Groceries', 'Dining', 'Shopping', 'Bills'].map(kind => `<option>${kind}</option>`).join('')}</select><select id="historyMonthFilter" aria-label="Filter by month"></select>`;
+  bar.querySelector('#historyFilter').addEventListener('input', event => {
+    historyFilter = event.target.value.trim().toLowerCase();
     renderHistory();
   });
-  history.insertBefore(input, entries);
+  bar.querySelector('#historyKindFilter').addEventListener('change', event => {
+    historyKind = event.target.value;
+    renderHistory();
+  });
+  bar.querySelector('#historyMonthFilter').addEventListener('change', event => {
+    historyMonth = event.target.value;
+    renderHistory();
+  });
+  history.insertBefore(bar, entries);
+  entries.addEventListener('click', event => {
+    if (!event.target.closest('[data-history-more]')) return;
+    historyMonthsShown += 3;
+    renderHistory();
+  });
+}
+// Renders `items` (each with a `month`) as month groups; `row` renders one item, `amount` gives its value.
+function historyGroupsHtml(items, row, amount, emptyText, showAll = false) {
+  if (!items.length) return `<div class="chart-empty">${emptyText}</div>`;
+  const groups = new Map();
+  items.forEach(item => {
+    if (!groups.has(item.month)) groups.set(item.month, []);
+    groups.get(item.month).push(item);
+  });
+  const monthIds = [...groups.keys()].sort((a, b) => b.localeCompare(a));
+  const shown = showAll ? monthIds : monthIds.slice(0, historyMonthsShown);
+  const html = shown
+    .map(monthId => {
+      const monthItems = groups.get(monthId);
+      const label = data.months.find(month => month.id === monthId)?.label || monthId;
+      const sum = monthItems.reduce((total, item) => total + num(amount(item)), 0);
+      return `<section class="history-group"><header class="history-group-head"><h3>${label}</h3><span>${monthItems.length} ${monthItems.length === 1 ? 'entry' : 'entries'} · <b>${money(sum)}</b></span></header>${monthItems.map(row).join('')}</section>`;
+    })
+    .join('');
+  const hidden = monthIds.length - shown.length;
+  return hidden > 0
+    ? `${html}<button type="button" class="button ghost history-more" data-history-more>Show older months (${hidden} more)</button>`
+    : html;
 }
 function renderHistory() {
   setupHistoryFilter();
-  const sorted = [...data.entries]
+  const monthFilter = document.getElementById('historyMonthFilter');
+  if (monthFilter) {
+    const monthIds = [...new Set(data.entries.map(entry => entry.month))].sort((a, b) => b.localeCompare(a));
+    if (historyMonth && !monthIds.includes(historyMonth)) historyMonth = '';
+    monthFilter.innerHTML = `<option value="">All months</option>${monthIds.map(id => `<option value="${id}">${data.months.find(month => month.id === id)?.label || id}</option>`).join('')}`;
+    monthFilter.value = historyMonth;
+  }
+  const sorted = data.entries
     .filter(
       entry =>
-        !historyFilter ||
-        String(entry.comment || '')
-          .toLowerCase()
-          .includes(historyFilter),
+        (!historyFilter ||
+          String(entry.comment || '')
+            .toLowerCase()
+            .includes(historyFilter)) &&
+        (!historyKind || expenseKind(entry) === historyKind) &&
+        (!historyMonth || entry.month === historyMonth),
     )
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   historyCount.textContent = `${sorted.length} expense${sorted.length === 1 ? '' : 's'}`;
-  historyEntries.innerHTML = sorted.length
-    ? sorted
-        .map(entry => {
-          const created = new Date(entry.createdAt),
-            label = data.months.find(month => month.id === entry.month)?.label || entry.month,
-            date = created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            time = created.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-            editIcon =
-              '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg>',
-            deleteIcon =
-              '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg>';
-          return `<article class="history-entry"><span class="history-date"><b>${date}</b><time datetime="${created.toISOString()}">${time}</time></span><span class="history-kind"><b>${entry.type}</b><span>${label}</span></span><b class="history-final">${money(entry.final)}</b><div class="history-actions"><button type="button" class="history-icon-button" data-edit-expense="${entry.id}" aria-label="Edit expense">${editIcon}</button><button type="button" class="history-icon-button history-delete" data-delete-expense="${entry.id}" aria-label="Delete expense">${deleteIcon}</button></div>${entry.comment ? `<p class="history-comment">${escapeHtml(entry.comment)}</p>` : ''}</article>`;
-        })
-        .join('')
-    : '<div class="chart-empty">No matching expenses.</div>';
+  const editIcon =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg>',
+    deleteIcon =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg>';
+  const row = entry => {
+    const created = new Date(entry.createdAt),
+      date = created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `<article class="history-row"><div class="history-row-main"><b>${expenseLabel(entry)}</b>${entry.comment ? `<p class="history-row-comment">${escapeHtml(entry.comment)}</p>` : ''}<time datetime="${created.toISOString()}">Entered ${date}</time></div><b class="history-row-amount">${money(entry.final)}</b><div class="history-actions"><button type="button" class="history-icon-button" data-edit-expense="${entry.id}" aria-label="Edit expense">${editIcon}</button><button type="button" class="history-icon-button history-delete" data-delete-expense="${entry.id}" aria-label="Delete expense">${deleteIcon}</button></div></article>`;
+  };
+  historyEntries.innerHTML = historyGroupsHtml(
+    sorted,
+    row,
+    entry => entry.final,
+    'No matching expenses.',
+    Boolean(historyMonth),
+  );
 }
 const expenseEditDialog = document.createElement('dialog');
 expenseEditDialog.id = 'expenseEditDialog';
@@ -2210,6 +2272,39 @@ saveExpense.onclick = () => {
   render();
 };
 render();
+
+// Water, electricity and gas are entered directly in the Months table.
+document.addEventListener('change', event => {
+  const field = event.target;
+  if (!field.matches?.('.monthly-table input.utility-input')) return;
+  const month = data.months.find(item => item.id === field.dataset.month);
+  if (!month) return;
+  const text = field.value.trim();
+  const value = text === '' ? 0 : Number(text);
+  if (!Number.isFinite(value) || value < 0) {
+    field.value = round(month[field.dataset.key]).toFixed(2);
+    return;
+  }
+  month[field.dataset.key] = round(value);
+  save();
+  syncMonth(month);
+  // Redraw after focus has moved so Tab/Enter lands on the next cell in the new table.
+  setTimeout(() => {
+    const next = document.activeElement?.matches?.('.monthly-table input.utility-input')
+      ? [document.activeElement.dataset.month, document.activeElement.dataset.key]
+      : null;
+    render();
+    const target =
+      next &&
+      document.querySelector(
+        `.monthly-table input.utility-input[data-month="${next[0]}"][data-key="${next[1]}"]`,
+      );
+    if (target) {
+      target.focus();
+      target.select();
+    }
+  });
+});
 
 function utilityValueMissing(month, key) {
   const now = new Date();
@@ -2560,16 +2655,6 @@ if ('serviceWorker' in navigator) {
 })();
 
 (() => {
-  const historyEditIcon =
-    '<svg viewBox="0 0 21 21" aria-hidden="true"><path d="M20.2312.768845c-1.0252-1.025127-2.6872-1.025127-3.7123 0L15.3617 1.926 19.074 5.63831l1.1572-1.15715c1.0251-1.02513 1.0251-2.68719 0-3.712315Z" fill="currentColor"/><path d="m18.0134 6.69897-3.7124-3.71231L2.15021 15.1375c-.61679.6168-1.07018 1.3775-1.319198 2.2135l-.79978 2.6849c-.07862.2639-.00627.5497.188456.7444.19473.1948.48052.2671.74445.1885l2.68489-.7998c.83597-.249 1.59672-.7024 2.21351-1.3192L18.0134 6.69897Z" fill="currentColor"/></svg>';
-  const historyRenderWithNewIcon = renderHistory;
-  renderHistory = () => {
-    historyRenderWithNewIcon();
-    document.querySelectorAll('.history-icon-button[data-edit-expense]').forEach(button => {
-      button.innerHTML = historyEditIcon;
-    });
-  };
-
   const editDialog = document.getElementById('expenseEditDialog');
   if (!editDialog) return;
   editDialog.innerHTML = `<form class="dialog-inner" id="expenseEditForm"><button type="button" class="dialog-close" id="closeExpenseEdit" aria-label="Close expense editor">×</button><h2>Edit expense</h2><div class="dialog-grid"><label class="expense-amount-field"><input id="expenseEditAmount" inputmode="decimal" placeholder="0.00" aria-label="Amount" required></label><label class="expense-final-field">Final amount<strong id="expenseEditFinal">$0.00</strong></label><label class="full-row"><div class="option-grid expense-category-options" id="expenseEditCategoryOptions"><button type="button" class="choice-option" data-edit-category="Groceries">Groceries</button><button type="button" class="choice-option" data-edit-category="Dining">Dining</button><button type="button" class="choice-option" data-edit-category="Shopping">Shopping</button><button type="button" class="choice-option" data-edit-category="Bills">Bills</button></div><div class="expense-suboptions hidden" id="expenseEditBillSuboptions"><span>Bill type</span><div class="option-grid"><button type="button" class="choice-option" data-edit-bill="Water">Water</button><button type="button" class="choice-option" data-edit-bill="Electricity">Electricity</button><button type="button" class="choice-option" data-edit-bill="Gas">Gas</button></div></div><div class="expense-suboptions" id="expenseEditShoppingSuboptions"><div class="option-grid shopping-suboptions"><button type="button" class="choice-option" data-edit-shopping="Entertainment">Entertainment</button><button type="button" class="choice-option" data-edit-shopping="Travel">Travel</button><button type="button" class="choice-option" data-edit-shopping="Health">Health</button><button type="button" class="choice-option" data-edit-shopping="Pets">Pets</button><button type="button" class="choice-option" data-edit-shopping="Misc">Misc</button></div></div><input id="expenseEditType" type="hidden"></label><label class="full-row"><span>CC modifier</span><div class="option-grid modifier-grid" id="expenseEditModifierOptions"><button type="button" class="choice-option" data-edit-modifier="0.94">94%</button><button type="button" class="choice-option" data-edit-modifier="0.95">95%</button><button type="button" class="choice-option" data-edit-modifier="0.97">97%</button><button type="button" class="choice-option" data-edit-modifier="0.98">98%</button><button type="button" class="choice-option" data-edit-modifier="0.99">99%</button><button type="button" class="choice-option" data-edit-modifier="1">100%</button></div><input id="expenseEditModifier" type="hidden"></label><label><select id="expenseEditMonth" aria-label="Month"></select></label><label class="full-row" id="expenseEditCommentField"><textarea id="expenseEditComment" maxlength="500" placeholder="What was this for?"></textarea></label></div><div class="toolbar modal-actions"><button type="button" class="button ghost" id="cancelExpenseEdit">Cancel</button><button type="submit" class="button primary">Edit expense</button></div></form>`;
@@ -3398,7 +3483,7 @@ if ('serviceWorker' in navigator) {
       const difference = round(num(latest.spending) - average);
       if (Math.abs(difference) >= 1)
         messages.push(
-          `Spending in <b>${monthLabels[Number(latest.id.slice(5, 7)) - 1].slice(0, 3)}</b> is <b>${money(Math.abs(difference))}</b> ${difference < 0 ? 'below' : 'above'} your three-month average.`,
+          `Spending in <b>${monthLabels[Number(latest.id.slice(5, 7)) - 1].slice(0, 3)}</b> is ${tone(`${money(Math.abs(difference))} ${difference < 0 ? 'below' : 'above'}`, difference < 0)} your three-month average.`,
         );
     }
     const sameMonthLastYear = data.months.find(
@@ -3410,7 +3495,7 @@ if ('serviceWorker' in navigator) {
       );
       if (change)
         messages.push(
-          `Food is <b>${Math.abs(change)}%</b> ${change > 0 ? 'above' : 'below'} last ${monthLabels[Number(latest.id.slice(5, 7)) - 1]}.`,
+          `Food is ${tone(`${Math.abs(change)}% ${change > 0 ? 'above' : 'below'}`, change < 0)} last ${monthLabels[Number(latest.id.slice(5, 7)) - 1]}.`,
         );
     }
     const year = Number(latest.id.slice(0, 4));
@@ -3425,7 +3510,7 @@ if ('serviceWorker' in navigator) {
       const difference = round(savedToDate - savedLastYear);
       if (difference)
         messages.push(
-          `You've saved <b>${money(Math.abs(difference))}</b> ${difference > 0 ? 'more' : 'less'} than this point last year.`,
+          `You've saved ${tone(`${money(Math.abs(difference))} ${difference > 0 ? 'more' : 'less'}`, difference > 0)} than this point last year.`,
         );
     }
     insights.innerHTML = messages
@@ -3974,7 +4059,7 @@ if ('serviceWorker' in navigator) {
       button.classList.toggle('active', selected);
       button.setAttribute('aria-selected', String(selected));
     });
-    document.getElementById('historyFilter')?.classList.toggle('hidden', historyView !== 'expenses');
+    document.getElementById('historyFilters')?.classList.toggle('hidden', historyView !== 'expenses');
     syncHeaderAction();
   };
   const renderExtraIncomeHistory = () => {
@@ -3992,24 +4077,22 @@ if ('serviceWorker' in navigator) {
       String(b.createdAt).localeCompare(String(a.createdAt)),
     );
     historyCountEl.textContent = `${sorted.length} entr${sorted.length === 1 ? 'y' : 'ies'}`;
-    historyEntriesEl.innerHTML = sorted.length
-      ? sorted
-          .map(entry => {
-            const created = new Date(entry.createdAt);
-            const monthLabel = data.months.find(month => month.id === entry.month)?.label || entry.month;
-            const date = entry.legacy
-              ? 'Legacy entry'
-              : created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const time = entry.legacy
-              ? 'Imported total'
-              : created.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-            const action = entry.legacy
-              ? '<span class="history-legacy-label">Read only</span>'
-              : `<button type="button" class="history-icon-button" data-edit-extra-income="${entry.id}" aria-label="Edit extra income"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg></button><button type="button" class="history-icon-button history-delete" data-delete-extra-income="${entry.id}" aria-label="Delete extra income"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg></button>`;
-            return `<article class="history-entry extra-income-entry"><span class="history-date"><b>${date}</b><time datetime="${created.toISOString()}">${time}</time></span><span class="history-kind"><b>${entry.category}</b><span>${monthLabel}</span></span><b class="history-final extra-income-value">+${money(entry.amount)}</b><div class="history-actions">${action}</div>${entry.description ? `<p class="history-comment">${escapeHtml(entry.description)}</p>` : ''}</article>`;
-          })
-          .join('')
-      : '<div class="chart-empty">Extra income you add will appear here.</div>';
+    const row = entry => {
+      const created = new Date(entry.createdAt);
+      const date = entry.legacy
+        ? 'Imported total'
+        : `Entered ${created.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      const action = entry.legacy
+        ? '<span class="history-legacy-label">Read only</span>'
+        : `<button type="button" class="history-icon-button" data-edit-extra-income="${entry.id}" aria-label="Edit extra income"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg></button><button type="button" class="history-icon-button history-delete" data-delete-extra-income="${entry.id}" aria-label="Delete extra income"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg></button>`;
+      return `<article class="history-row extra-income-row"><div class="history-row-main"><b>${entry.category}</b>${entry.description ? `<p class="history-row-comment">${escapeHtml(entry.description)}</p>` : ''}<time${entry.legacy ? '' : ` datetime="${created.toISOString()}"`}>${date}</time></div><b class="history-row-amount income">+${money(entry.amount)}</b><div class="history-actions">${action}</div></article>`;
+    };
+    historyEntriesEl.innerHTML = historyGroupsHtml(
+      sorted,
+      row,
+      entry => entry.amount,
+      'Extra income you add will appear here.',
+    );
   };
 
   setupHistoryTabs();
@@ -4222,6 +4305,45 @@ if ('serviceWorker' in navigator) {
       value: num(entry.total),
     }));
   };
+  const monthsBetween = (from, to) =>
+    (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 +
+    Number(to.slice(5, 7)) -
+    Number(from.slice(5, 7));
+  // Market gain for the year: the change in balance minus your own contributions over the same span.
+  // Measured from the last balance before 1 January, or the first one this year when there is none.
+  const accountGain = (account, year) => {
+    if (isSavings(account)) return null;
+    const history = balances(account.id),
+      latest = history.at(-1),
+      start = `${year}-01-01`,
+      baseline = history.findLast(entry => entry.date < start) || history.find(entry => entry.date >= start);
+    if (!latest || !baseline || baseline === latest) return null;
+    const added = is401k(account)
+      ? round((num(account.yearlyContribution) / 12) * monthsBetween(baseline.date, latest.date))
+      : round(
+          contributions()
+            .filter(
+              entry =>
+                entry.accountId === account.id && entry.date > baseline.date && entry.date <= latest.date,
+            )
+            .reduce((sum, entry) => sum + entry.amount, 0),
+        );
+    const gain = round(num(latest.total) - num(baseline.total) - added),
+      invested = num(baseline.total) + added,
+      fromYearEnd = baseline.date < start && baseline.date >= `${Number(year) - 1}-12-01`;
+    return {
+      gain,
+      percent: invested > 0 ? (gain / invested) * 100 : null,
+      label: fromYearEnd
+        ? 'Market gain this year'
+        : `Market gain since ${new Date(`${baseline.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+    };
+  };
+  const signedMoney = value => `${value < 0 ? '−' : '+'}${money(Math.abs(value))}`;
+  const gainStat = result =>
+    result
+      ? `<span class="investment-account-stat gain"><span>${result.label}</span><strong class="${result.gain < 0 ? 'bad' : 'good'}">${signedMoney(result.gain)}${result.percent === null ? '' : `<small>${result.percent < 0 ? '−' : '+'}${Math.abs(result.percent).toFixed(1)}%</small>`}</strong></span>`
+      : '';
   const axisMoney = value => {
     const absolute = Math.abs(value),
       formatted =
@@ -4252,6 +4374,24 @@ if ('serviceWorker' in navigator) {
       gradientId = `investment-fill-${chartSequence++}`;
     return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".2"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${[max, max / 2, 0].map(value => `<g><line class="investment-chart-grid" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="investment-chart-axis" x="${left - 7}" y="${y(value) + 4}" text-anchor="end">${axisMoney(value)}</text></g>`).join('')}<path d="${path} L ${x(points.length - 1)} ${height - bottom} L ${x(0)} ${height - bottom} Z" fill="url(#${gradientId})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${points.map((point, index) => `<circle cx="${x(index)}" cy="${y(point.value)}" r="4" fill="${color}"><title>${escapeHtml(point.label)}: ${money(point.value)}</title></circle>`).join('')}${indexes.map(index => `<text class="investment-chart-axis" x="${x(index)}" y="${height - 8}" text-anchor="middle">${escapeHtml(points[index].label)}</text>`).join('')}</svg>`;
   };
+  const investmentBarChart = (points, color, label, emptyText) => {
+    if (!points.some(point => point.value > 0))
+      return `<div class="investment-chart-empty">${emptyText}</div>`;
+    const width = 520,
+      height = 180,
+      left = 48,
+      right = 12,
+      top = 12,
+      bottom = 28,
+      plotWidth = width - left - right,
+      plotHeight = height - top - bottom,
+      max = Math.max(1, ...points.map(point => point.value)),
+      slot = plotWidth / points.length,
+      barWidth = Math.max(4, slot * 0.6),
+      y = value => top + ((max - value) * plotHeight) / max,
+      indexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
+    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(label)}">${[max, max / 2, 0].map(value => `<g><line class="investment-chart-grid" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="investment-chart-axis" x="${left - 7}" y="${y(value) + 4}" text-anchor="end">${axisMoney(value)}</text></g>`).join('')}${points.map((point, index) => (point.value > 0 ? `<rect x="${(left + index * slot + (slot - barWidth) / 2).toFixed(1)}" y="${y(point.value).toFixed(1)}" width="${barWidth.toFixed(1)}" height="${(height - bottom - y(point.value)).toFixed(1)}" rx="3" fill="${color}"><title>${escapeHtml(point.label)}: ${money(point.value)}</title></rect>` : '')).join('')}${indexes.map(index => `<text class="investment-chart-axis" x="${(left + index * slot + slot / 2).toFixed(1)}" y="${height - 8}" text-anchor="middle">${escapeHtml(points[index].label)}</text>`).join('')}</svg>`;
+  };
   const pieStyle = (values, colorIndexes = values.map((_, index) => index)) => {
     const total = values.reduce((sum, value) => sum + value, 0);
     if (!total) return 'var(--soft)';
@@ -4264,9 +4404,16 @@ if ('serviceWorker' in navigator) {
       })
       .join(',')})`;
   };
-  const pieCard = (title, subtitle, accounts, values, colorIndexes = accounts.map((_, index) => index)) => {
+  const pieCard = (
+    title,
+    subtitle,
+    accounts,
+    values,
+    colorIndexes = accounts.map((_, index) => index),
+    extra = '',
+  ) => {
     const total = round(values.reduce((sum, value) => sum + value, 0));
-    return `<article class="investment-summary-card"><div><h3>${title}</h3><p>${subtitle}</p><div class="investment-legend">${accounts.map((account, index) => `<span><i style="--legend-color:${colorAt(colorIndexes[index])}"></i>${escapeHtml(account.name)} · ${money(values[index])}</span>`).join('')}</div></div><div class="investment-donut" style="--investment-pie:${pieStyle(values, colorIndexes)}" role="img" aria-label="${escapeHtml(title)}: ${money(total)}"><strong class="investment-donut-total">${money(total)}</strong></div></article>`;
+    return `<article class="investment-summary-card"><div><h3>${title}</h3><p>${subtitle}</p>${extra}<div class="investment-legend">${accounts.map((account, index) => `<span><i style="--legend-color:${colorAt(colorIndexes[index])}"></i>${escapeHtml(account.name)} · ${money(values[index])}</span>`).join('')}</div></div><div class="investment-donut" style="--investment-pie:${pieStyle(values, colorIndexes)}" role="img" aria-label="${escapeHtml(title)}: ${money(total)}"><strong class="investment-donut-total">${money(total)}</strong></div></article>`;
   };
   const selectInvestmentAccount = id => {
     accountInput.value = id;
@@ -4321,7 +4468,7 @@ if ('serviceWorker' in navigator) {
   };
   const accountCharts = (account, year, color) => {
     const showContributions = account.type === 'Brokerage';
-    return `<div class="investment-account-charts${showContributions ? '' : ' single'}">${showContributions ? `<section class="investment-chart"><h4>Contributions · ${year}</h4><p>Monthly cash contributions</p>${investmentLineChart(contributionPoints(account, year), color, `${account.name} monthly contributions for ${year}`, 'Contributions will appear here.')}</section>` : ''}<section class="investment-chart"><h4>Total amount</h4><p>Entire monthly balance history</p>${investmentLineChart(balancePoints(account), color, `${account.name} total balance over time`, 'Use Update totals to begin this graph.')}</section></div>`;
+    return `<div class="investment-account-charts${showContributions ? '' : ' single'}">${showContributions ? `<section class="investment-chart"><h4>Contributions · ${year}</h4><p>Monthly cash contributions</p>${investmentBarChart(contributionPoints(account, year), color, `${account.name} monthly contributions for ${year}`, 'Contributions will appear here.')}</section>` : ''}<section class="investment-chart"><h4>Total amount</h4><p>Entire monthly balance history</p>${investmentLineChart(balancePoints(account), color, `${account.name} total balance over time`, 'Use Update totals to begin this graph.')}</section></div>`;
   };
   const settingsRow = (account, index, total) => {
     const goalField = is401k(account) ? 'yearlyContribution' : 'annualGoal',
@@ -4360,9 +4507,22 @@ if ('serviceWorker' in navigator) {
       contributionAccounts = accounts.filter(account => !isSavings(account)),
       contributionValues = contributionAccounts.map(account => accountYearContribution(account, year)),
       contributionColorIndexes = contributionAccounts.map(account => accounts.indexOf(account)),
-      balanceValues = accounts.map(currentAccountTotal);
+      balanceValues = accounts.map(currentAccountTotal),
+      gains = accounts.map(account => accountGain(account, year)),
+      measured = gains.filter(Boolean),
+      totalGain = round(measured.reduce((sum, result) => sum + result.gain, 0)),
+      gainSummary = measured.length
+        ? `<p class="investment-gain-summary">${new Set(measured.map(result => result.label)).size === 1 ? measured[0].label : 'Market gain'} <b class="${totalGain < 0 ? 'bad' : 'good'}">${signedMoney(totalGain)}</b></p>`
+        : '';
     summary.innerHTML =
-      pieCard('Total Portfolio Value', 'Latest balance update', accounts, balanceValues) +
+      pieCard(
+        'Total Portfolio Value',
+        'Latest balance update',
+        accounts,
+        balanceValues,
+        undefined,
+        gainSummary,
+      ) +
       pieCard(
         'Total Added This Year',
         `Cash contributions through ${new Date(`${month}-01T12:00:00`).toLocaleDateString('en-US', { month: 'long' })}`,
@@ -4376,7 +4536,7 @@ if ('serviceWorker' in navigator) {
             const yearContribution = accountYearContribution(account, year),
               currentTotal = balanceValues[index],
               goal = is401k(account) ? num(account.yearlyContribution) : num(account.annualGoal),
-              progress = !is401k(account) && goal ? Math.min(100, (yearContribution / goal) * 100) : 0,
+              progress = goal ? Math.min(100, (yearContribution / goal) * 100) : 0,
               color = colorAt(index),
               secondaryStats =
                 goal > 0
@@ -4384,7 +4544,7 @@ if ('serviceWorker' in navigator) {
                   : '';
             if (isSavings(account))
               return `<article class="investment-account-card investment-savings-card"><div class="investment-account-info"><div class="investment-account-heading"><h3>${escapeHtml(account.name)}</h3><span class="investment-account-type">${escapeHtml(account.type)}</span></div><div class="investment-account-stats"><span class="investment-account-stat balance"><span>Current balance</span><strong>${money(currentTotal)}</strong></span></div></div></article>`;
-            return `<article class="investment-account-card"><div class="investment-account-info"><div class="investment-account-heading"><h3>${escapeHtml(account.name)}</h3><span class="investment-account-type">${escapeHtml(account.type)}</span></div><div class="investment-account-stats"><span class="investment-account-stat balance"><span>Current balance</span><strong>${money(currentTotal)}</strong></span>${secondaryStats}</div></div>${!is401k(account) && goal ? `<div class="investment-progress" aria-label="${Math.round(progress)}% of yearly goal"><i style="width:${progress}%;background:${color}"></i></div><p class="investment-goal-label"><span>${Math.round(progress)}%</span><span>${money(goal)}</span></p>` : ''}${accountCharts(account, year, color)}</article>`;
+            return `<article class="investment-account-card"><div class="investment-account-info"><div class="investment-account-heading"><h3>${escapeHtml(account.name)}</h3><span class="investment-account-type">${escapeHtml(account.type)}</span></div><div class="investment-account-stats"><span class="investment-account-stat balance"><span>Current balance</span><strong>${money(currentTotal)}</strong></span>${gainStat(gains[index])}${secondaryStats}</div></div>${goal ? `<div class="investment-progress" aria-label="${Math.round(progress)}% of yearly ${is401k(account) ? 'contribution' : 'goal'}"><i style="width:${progress}%;background:${color}"></i></div><p class="investment-goal-label"><span>${Math.round(progress)}%</span><span>${money(goal)}</span></p>` : ''}${accountCharts(account, year, color)}</article>`;
           })
           .join('')
       : '<div class="chart-empty">Add an investment account in Investment Settings.</div>';
@@ -4598,64 +4758,56 @@ if ('serviceWorker' in navigator) {
   if (displayMode) applyDisplayMode();
 })();
 
+// Travel and Dining are tracked as expense categories from the month Estuary began.
+// Earlier travel comes from yearly totals entered by hand, spread evenly across the months they cover.
+const trackedCategoryStart = '2026-09';
+const historicTravel = {
+  2021: { total: 3000, months: 12 },
+  2022: { total: 4500, months: 12 },
+  2023: { total: 13000, months: 12 },
+  2024: { total: 15300, months: 12 },
+  2025: { total: 18000, months: 12 },
+  2026: { total: 15700, months: 9 },
+};
+function historicalTravelForMonth(monthId) {
+  const history = historicTravel[monthId.slice(0, 4)];
+  const monthNumber = Number(monthId.slice(5, 7));
+  if (!history || monthNumber > history.months) return 0;
+  const baseCents = Math.floor((history.total * 100) / history.months);
+  const cents =
+    monthNumber === history.months ? history.total * 100 - baseCents * (history.months - 1) : baseCents;
+  return cents / 100;
+}
+function trackedSpending(monthId, matches) {
+  return round(
+    data.entries
+      .filter(entry => entry.month === monthId && entry.type === 'Spending' && matches(entry))
+      .reduce((sum, entry) => sum + num(entry.final), 0),
+  );
+}
+function travelForMonth(monthId) {
+  return monthId < trackedCategoryStart
+    ? historicalTravelForMonth(monthId)
+    : trackedSpending(monthId, entry => entry.subcategory === 'Travel');
+}
+function diningForMonth(monthId) {
+  return monthId < trackedCategoryStart ? 0 : trackedSpending(monthId, entry => entry.category === 'Dining');
+}
+// Travel for a year, optionally only through a given month ('01'-'12').
+function travelYearTotal(year, throughMonth = '12') {
+  let total = 0;
+  for (let month = 1; month <= Number(throughMonth); month++)
+    total += travelForMonth(`${year}-${String(month).padStart(2, '0')}`);
+  return round(total);
+}
+
 (() => {
   let spendingMetric = 'all';
-  const trackedCategoryStart = '2027-09';
-  const historicTravel = {
-    2021: { total: 3000, months: 12 },
-    2022: { total: 4500, months: 12 },
-    2023: { total: 13000, months: 12 },
-    2024: { total: 15300, months: 12 },
-    2025: { total: 18000, months: 12 },
-    2026: { total: 15700, months: 9 },
-  };
-  window.estuaryTravelHistory = historicTravel;
-
-  const historicalTravelForMonth = monthId => {
-    const history = historicTravel[monthId.slice(0, 4)];
-    const monthNumber = Number(monthId.slice(5, 7));
-    if (!history || monthNumber > history.months) return 0;
-    const baseCents = Math.floor((history.total * 100) / history.months);
-    const cents =
-      monthNumber === history.months ? history.total * 100 - baseCents * (history.months - 1) : baseCents;
-    return cents / 100;
-  };
-  const trackedSpendingCategory = (monthId, subcategory) =>
-    round(
-      data.entries
-        .filter(
-          entry => entry.month === monthId && entry.type === 'Spending' && entry.subcategory === subcategory,
-        )
-        .reduce((sum, entry) => sum + num(entry.final), 0),
-    );
-  const trackedDining = monthId =>
-    round(
-      data.entries
-        .filter(entry => entry.month === monthId && entry.type === 'Spending' && entry.category === 'Dining')
-        .reduce((sum, entry) => sum + num(entry.final), 0),
-    );
-  const travelYearTotal = year =>
-    historicTravel[year]?.total ??
-    round(
-      data.entries
-        .filter(
-          entry =>
-            entry.month.startsWith(`${year}-`) &&
-            entry.month >= trackedCategoryStart &&
-            entry.type === 'Spending' &&
-            entry.subcategory === 'Travel',
-        )
-        .reduce((sum, entry) => sum + num(entry.final), 0),
-    );
   const spendingPoints = metric =>
     chartMonths().map(month => {
       let value = num(month.spending);
-      if (metric === 'travel')
-        value =
-          month.id < trackedCategoryStart
-            ? historicalTravelForMonth(month.id)
-            : trackedSpendingCategory(month.id, 'Travel');
-      if (metric === 'dining') value = month.id < trackedCategoryStart ? 0 : trackedDining(month.id);
+      if (metric === 'travel') value = travelForMonth(month.id);
+      if (metric === 'dining') value = diningForMonth(month.id);
       const year = month.id.slice(0, 4);
       const partialYear = historicTravel[year]?.months < 12 || year === currentMonthKey().slice(0, 4);
       return {
@@ -4751,11 +4903,17 @@ if ('serviceWorker' in navigator) {
     const priorId = `${priorDate.getFullYear()}-${String(priorDate.getMonth() + 1).padStart(2, '0')}`;
     const previous = data.months.find(month => month.id === priorId);
     const shortMonth = month => monthLabels[Number(month.id.slice(5, 7)) - 1].slice(0, 3);
-    const addMonthlyChange = (label, currentValue, previousValue, { up = 'rose', down = 'fell' } = {}) => {
+    // Costs are good news when they fall; savings when they rise.
+    const addMonthlyChange = (
+      label,
+      currentValue,
+      previousValue,
+      { up = 'rose', down = 'fell', higherIsBetter = false } = {},
+    ) => {
       const difference = round(num(currentValue) - num(previousValue));
       if (Math.abs(difference) < 1) return;
       messages.push(
-        `${label} <b>${difference > 0 ? up : down} ${money(Math.abs(difference))}</b> from ${shortMonth(previous)} to ${shortMonth(latest)}.`,
+        `${label} ${tone(`${difference > 0 ? up : down} ${money(Math.abs(difference))}`, difference > 0 === higherIsBetter)} from ${shortMonth(previous)} to ${shortMonth(latest)}.`,
       );
     };
     if (previous) {
@@ -4769,6 +4927,7 @@ if ('serviceWorker' in navigator) {
       addMonthlyChange('Savings', total(latest).saved, total(previous).saved, {
         up: 'improved by',
         down: 'fell by',
+        higherIsBetter: true,
       });
       const latestIncome = num(total(latest).income),
         previousIncome = num(total(previous).income);
@@ -4778,7 +4937,7 @@ if ('serviceWorker' in navigator) {
           rateDifference = round(latestRate - previousRate);
         if (Math.abs(rateDifference) >= 1)
           messages.push(
-            `Your savings rate was <b>${latestRate}%</b> in ${shortMonth(latest)}, <b>${Math.abs(rateDifference)} points ${rateDifference > 0 ? 'higher' : 'lower'}</b> than ${shortMonth(previous)}.`,
+            `Your savings rate was <b>${latestRate}%</b> in ${shortMonth(latest)}, ${tone(`${Math.abs(rateDifference)} points ${rateDifference > 0 ? 'higher' : 'lower'}`, rateDifference > 0)} than ${shortMonth(previous)}.`,
           );
       }
       const entryTotal = (monthId, predicate) =>
@@ -4802,7 +4961,7 @@ if ('serviceWorker' in navigator) {
         const extraDifference = round(latestExtra - previousExtra);
         if (Math.abs(extraDifference) >= 1)
           messages.push(
-            `Extra Income was <b>${money(latestExtra)}</b> in ${shortMonth(latest)}, <b>${money(Math.abs(extraDifference))} ${extraDifference > 0 ? 'more' : 'less'}</b> than ${shortMonth(previous)}.`,
+            `Extra Income was <b>${money(latestExtra)}</b> in ${shortMonth(latest)}, ${tone(`${money(Math.abs(extraDifference))} ${extraDifference > 0 ? 'more' : 'less'}`, extraDifference > 0)} than ${shortMonth(previous)}.`,
           );
       }
     }
@@ -4812,7 +4971,7 @@ if ('serviceWorker' in navigator) {
       const difference = round(num(latest.spending) - average);
       if (Math.abs(difference) >= 1)
         messages.push(
-          `Spending in <b>${latestMonthName.slice(0, 3)}</b> is <b>${money(Math.abs(difference))}</b> ${difference < 0 ? 'below' : 'above'} your three-month average.`,
+          `Spending in <b>${latestMonthName.slice(0, 3)}</b> is ${tone(`${money(Math.abs(difference))} ${difference < 0 ? 'below' : 'above'}`, difference < 0)} your three-month average.`,
         );
     }
     const lastYearMonth = data.months.find(
@@ -4822,7 +4981,7 @@ if ('serviceWorker' in navigator) {
       const difference = round(num(latest.spending) - num(lastYearMonth.spending));
       if (Math.abs(difference) >= 1)
         messages.push(
-          `You spent <b>${money(Math.abs(difference))}</b> ${difference < 0 ? 'less' : 'more'} than last ${latestMonthName}.`,
+          `You spent ${tone(`${money(Math.abs(difference))} ${difference < 0 ? 'less' : 'more'}`, difference < 0)} than last ${latestMonthName}.`,
         );
     }
     if (lastYearMonth && num(lastYearMonth.groceries) > 0) {
@@ -4831,7 +4990,7 @@ if ('serviceWorker' in navigator) {
       );
       if (change)
         messages.push(
-          `Food is <b>${Math.abs(change)}%</b> ${change > 0 ? 'above' : 'below'} last ${latestMonthName}.`,
+          `Food is ${tone(`${Math.abs(change)}% ${change > 0 ? 'above' : 'below'}`, change < 0)} last ${latestMonthName}.`,
         );
     }
     const year = Number(latest.id.slice(0, 4)),
@@ -4846,26 +5005,11 @@ if ('serviceWorker' in navigator) {
     const savedDifference = round(savedToDate - savedLastYear);
     if (savedDifference)
       messages.push(
-        `You've saved <b>${money(Math.abs(savedDifference))}</b> ${savedDifference > 0 ? 'more' : 'less'} than this point last year.`,
+        `You've saved ${tone(`${money(Math.abs(savedDifference))} ${savedDifference > 0 ? 'more' : 'less'}`, savedDifference > 0)} than this point last year.`,
       );
-    if (savedToDate) messages.push(`You've saved <b>${money(savedToDate)}</b> so far in ${year}.`);
-    const travelHistory = window.estuaryTravelHistory?.[String(year)],
-      monthsThroughCutoff = Number(cutoff);
-    const travelToDate = travelHistory
-      ? round(
-          (travelHistory.total * Math.min(monthsThroughCutoff, travelHistory.months)) / travelHistory.months,
-        )
-      : round(
-          data.entries
-            .filter(
-              entry =>
-                entry.month.startsWith(`${year}-`) &&
-                entry.month.slice(5) <= cutoff &&
-                entry.type === 'Spending' &&
-                entry.subcategory === 'Travel',
-            )
-            .reduce((sum, entry) => sum + num(entry.final), 0),
-        );
+    if (savedToDate)
+      messages.push(`You've saved ${tone(money(savedToDate), savedToDate > 0)} so far in ${year}.`);
+    const travelToDate = travelYearTotal(year, cutoff);
     const spendingToDate = round(thisYear.reduce((sum, month) => sum + num(month.spending), 0));
     if (travelToDate > 0 && spendingToDate > 0) {
       const travelShare = Math.round((travelToDate / spendingToDate) * 100);
@@ -4874,19 +5018,20 @@ if ('serviceWorker' in navigator) {
     if (thisYear.length) {
       const best = [...thisYear].sort((a, b) => total(b).saved - total(a).saved)[0];
       messages.push(
-        `<b>${monthLabels[Number(best.id.slice(5, 7)) - 1]}</b> is your strongest savings month this year at <b>${money(total(best).saved)}</b>.`,
+        `<b>${monthLabels[Number(best.id.slice(5, 7)) - 1]}</b> is your strongest savings month this year at ${tone(money(total(best).saved), true)}.`,
       );
     }
     const recent = completed.slice(-12);
     if (recent.length >= 3) {
       const lowest = [...recent].sort((a, b) => num(a.spending) - num(b.spending))[0];
       messages.push(
-        `<b>${lowest.label}</b> had your lowest Spending total in the last ${recent.length} months: <b>${money(lowest.spending)}</b>.`,
+        `<b>${lowest.label}</b> had your lowest Spending total in the last ${recent.length} months: ${tone(money(lowest.spending), true)}.`,
       );
     }
     let streak = 0;
     for (let index = completed.length - 1; index >= 0 && total(completed[index]).saved > 0; index--) streak++;
-    if (streak >= 2) messages.push(`You've saved money for <b>${streak} completed months</b> in a row.`);
+    if (streak >= 2)
+      messages.push(`You've saved money for ${tone(`${streak} completed months`, true)} in a row.`);
     const activeAccountIds = new Set(
       (data.settings.investmentAccounts || [])
         .filter(account => !account.archived)
@@ -4914,7 +5059,7 @@ if ('serviceWorker' in navigator) {
           day: 'numeric',
         });
         messages.push(
-          `Your portfolio is <b>${money(Math.abs(difference))} ${difference > 0 ? 'higher' : 'lower'}</b> than its ${since} update.`,
+          `Your portfolio is ${tone(`${money(Math.abs(difference))} ${difference > 0 ? 'higher' : 'lower'}`, difference > 0)} than its ${since} update.`,
         );
       }
     }
