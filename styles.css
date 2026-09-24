@@ -4456,7 +4456,7 @@ body:not(.auth-locked) #authGate {
 .history-group {
   display: grid;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .history-group-head {
   display: flex;
@@ -4464,7 +4464,7 @@ body:not(.auth-locked) #authGate {
   align-items: baseline;
   gap: 12px;
   padding: 0 4px 6px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 .history-group-head h3 {
   margin: 0;
