@@ -1759,7 +1759,10 @@ function renderMonthlyTimeline() {
           yearNumber > thisYear
             ? ''
             : `${yearNumber === thisYear ? 'Saved so far' : 'Total saved'} ${money(totalSaved)}`;
-      return `<button class="${year === selectedYear ? 'selected' : ''}" data-year-tab="${year}"><strong>${year}</strong>${subline ? `<span>${subline}</span>` : ''}</button>`;
+      const classes = [year === selectedYear ? 'selected' : '', subline ? '' : 'year-future']
+        .filter(Boolean)
+        .join(' ');
+      return `<button class="${classes}" data-year-tab="${year}"><strong>${year}</strong>${subline ? `<span>${subline}</span>` : ''}</button>`;
     })
     .join('');
 }

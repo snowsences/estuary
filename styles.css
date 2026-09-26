@@ -469,6 +469,11 @@ input {
   cursor: pointer;
   font: inherit;
 }
+/* A future year has nothing but its label yet (no saved total to show), so its card only needs
+   about half the width of one with a subline. */
+.year-timeline button.year-future {
+  flex-basis: 74px;
+}
 .year-timeline button.selected {
   border-color: var(--orange);
   background: #2a2923;
