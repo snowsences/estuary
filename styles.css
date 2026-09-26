@@ -3605,6 +3605,12 @@ body:not(.auth-locked) #authGate {
   aspect-ratio: 1;
   margin: auto;
   border-radius: 50%;
+}
+.investment-donut::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
   background: var(--investment-pie);
 }
 .investment-donut::after {
@@ -4831,7 +4837,9 @@ dialog .dialog-inner,
   .animate-in :is(.chart-svg, .investment-chart svg) :is(circle, rect, path[fill^='url']) {
     animation: fade-in 500ms var(--ease-standard) 250ms both;
   }
-  .animate-in .investment-donut {
+  /* Masked/animated on ::before (the ring layer) only, so the sweep-in never clips the
+     donut-hole cover or the center total, which sit in front of it as separate layers. */
+  .animate-in .investment-donut::before {
     -webkit-mask: conic-gradient(#000 var(--donut-sweep), transparent 0);
     mask: conic-gradient(#000 var(--donut-sweep), transparent 0);
     animation: donut-sweep 800ms var(--ease-decelerate) both;
