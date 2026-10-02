@@ -2305,36 +2305,41 @@ document.getElementById('expenseEditForm').addEventListener('submit', event => {
   expenseEditDialog.close();
   render();
 });
-const meganReminderDialog = document.createElement('dialog');
-meganReminderDialog.id = 'meganReminderDialog';
-meganReminderDialog.className = 'megan-reminder-dialog';
-meganReminderDialog.innerHTML =
-  '<div class="dialog-inner"><button class="dialog-close" id="closeMeganReminder" aria-label="Close reminder">×</button><h2>Megan owes</h2><p id="meganReminderText"></p><div class="toolbar" style="justify-content:flex-end;margin:18px 0 0"><button class="button primary" id="dismissMeganReminder">Got it</button></div></div>';
-document.body.append(meganReminderDialog);
+const meganReminderBanner = document.createElement('aside');
+meganReminderBanner.id = 'meganReminderBanner';
+meganReminderBanner.className = 'megan-reminder-banner hidden';
+meganReminderBanner.setAttribute('role', 'status');
+meganReminderBanner.setAttribute('aria-live', 'polite');
+meganReminderBanner.innerHTML =
+  '<div class="megan-reminder-copy"><b>Megan owes</b><span id="meganReminderText"></span></div><button type="button" class="megan-reminder-dismiss" id="dismissMeganReminder" aria-label="Dismiss Megan owes reminder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg></button>';
+document.querySelector('.top-header')?.before(meganReminderBanner);
 function maybeShowMeganReminder() {
-  const now = new Date();
-  if (now.getDate() !== 1 || meganReminderDialog.open) return;
-  const current = currentMonthKey();
-  if (data.settings.meganReminderSeen === current) return;
+  const now = new Date(),
+    current = currentMonthKey();
+  if (data.settings.meganReminderSeen === current) {
+    meganReminderBanner.classList.add('hidden');
+    return;
+  }
   const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1),
     previousId = `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}`,
     month = data.months.find(item => item.id === previousId);
-  if (!month) return;
+  if (!month) {
+    meganReminderBanner.classList.add('hidden');
+    return;
+  }
   document.getElementById('meganReminderText').textContent =
     `For ${month.label}, Megan owes ${money(total(month).megan)}.`;
-  meganReminderDialog.showModal();
+  meganReminderBanner.dataset.reminderMonth = current;
+  meganReminderBanner.classList.remove('hidden');
 }
 function dismissMeganReminder() {
-  data.settings.meganReminderSeen = currentMonthKey();
+  const reminderMonth = meganReminderBanner.dataset.reminderMonth || currentMonthKey();
+  data.settings.meganReminderSeen = reminderMonth;
+  meganReminderBanner.classList.add('hidden');
   save();
   syncSettings();
-  meganReminderDialog.close();
 }
-document.getElementById('closeMeganReminder').onclick = dismissMeganReminder;
 document.getElementById('dismissMeganReminder').onclick = dismissMeganReminder;
-meganReminderDialog.addEventListener('click', event => {
-  if (event.target === meganReminderDialog) dismissMeganReminder();
-});
 function bytesToBase64(bytes) {
   let binary = '';
   bytes.forEach(byte => (binary += String.fromCharCode(byte)));
