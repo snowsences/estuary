@@ -3552,13 +3552,13 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       const type = document.getElementById('expenseType')?.value;
       originalAddExpense.call(addButton, event);
       if (original <= 0 || !['Spending', 'Groceries', 'Water', 'Electricity', 'Gas'].includes(type)) return;
-      expenseFeedback = { amount, type, expires: Date.now() + 2500 };
+      expenseFeedback = { amount, type, expires: Date.now() + 4500 };
       window.clearTimeout(feedbackTimer);
       renderExpenseFeedback();
       feedbackTimer = window.setTimeout(() => {
         expenseFeedback = null;
         renderExpenseFeedback();
-      }, 2500);
+      }, 4500);
     };
   afterRender(() => {
     renderExpenseFeedback();
@@ -5632,7 +5632,7 @@ function travelYearTotal(year, throughMonth = '12') {
       return;
     const start = performance.now();
     const step = now => {
-      const progress = Math.min(1, (now - start) / 450),
+      const progress = Math.min(1, (now - start) / 900),
         eased = 1 - (1 - progress) ** 3;
       changes.forEach(({ element, from, to }) => (element.textContent = money(from + (to - from) * eased)));
       if (progress < 1) frame = requestAnimationFrame(step);

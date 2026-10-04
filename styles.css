@@ -2498,15 +2498,15 @@ body.auth-locked dialog {
   font-size: 15px !important;
   font-weight: 700;
   white-space: nowrap;
-  animation: metric-expense-confirmation 2.5s ease both;
+  animation: metric-expense-confirmation 4.5s ease both;
 }
 @keyframes metric-expense-confirmation {
   0% {
     opacity: 0;
     transform: translateY(2px);
   }
-  10%,
-  90% {
+  5.56%,
+  94.44% {
     opacity: 1;
     transform: translateY(0);
   }
