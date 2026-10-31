@@ -5167,35 +5167,11 @@ dialog .dialog-inner,
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 10px 8px 10px 14px;
 }
-.history-todo-check {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.history-todo-copy {
   min-width: 0;
-  min-height: 36px;
-  cursor: pointer;
-}
-.history-todo-check input {
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
   margin: 0;
-  accent-color: var(--green);
-  cursor: pointer;
-}
-.history-todo-check span {
-  min-width: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.todo-completed .history-todo-check span {
-  color: var(--muted);
-  text-decoration: line-through;
-}
-.todo-completed-title {
-  margin: 20px 0 4px;
-  color: var(--muted);
-  font-size: 15px;
 }
 @media (max-width: 450px) {
   .history-view-tab {

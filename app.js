@@ -4410,6 +4410,8 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   const todosPanel = document.getElementById('historyTodos');
   const todoEntries = document.getElementById('todoEntries');
   const todoText = document.getElementById('todoText');
+  const todoForm = document.getElementById('todoForm');
+  const addTodo = document.getElementById('addTodo');
   const todoDialog = document.getElementById('todoDialog');
   const todoEditText = document.getElementById('todoEditText');
   let editingTodoId = '';
@@ -4464,9 +4466,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     if (!headerAction) return;
     const addsIncome = mainHistoryIsActive() && historyView === 'income';
     const addsTodo = mainHistoryIsActive() && historyView === 'todos';
+    headerAction.classList.toggle('hidden', addsTodo && !todoText.value.trim());
     headerAction.textContent = addsTodo ? '+ Add to-do' : addsIncome ? '+ Add extra income' : '+ Add expense';
     headerAction.onclick = addsTodo
-      ? () => { todoText.scrollIntoView({ block: 'center' }); todoText.focus(); }
+      ? () => todoForm.requestSubmit()
       : addsIncome ? () => openExtraIncome() : openExpenseAction;
   };
   const setupHistoryTabs = () => {
@@ -4502,13 +4505,11 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     const items = data.todos.filter(entry => !entry.deleted).sort((a, b) =>
       String(b.createdAt).localeCompare(String(a.createdAt)),
     );
-    const unfinished = items.filter(entry => !entry.completed);
-    const completed = items.filter(entry => entry.completed);
-    historyCountEl.textContent = `${unfinished.length} to do · ${completed.length} completed`;
-    const row = entry => `<article class="history-row todo-row${entry.completed ? ' todo-completed' : ''}"><label class="history-todo-check"><input type="checkbox" data-toggle-todo="${entry.id}" ${entry.completed ? 'checked' : ''}><span>${escapeHtml(entry.text)}</span></label><div class="history-actions"><button type="button" class="history-icon-button" data-edit-todo="${entry.id}" aria-label="Edit to-do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg></button><button type="button" class="history-icon-button history-delete" data-delete-todo="${entry.id}" aria-label="Delete to-do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg></button></div></article>`;
+    historyCountEl.textContent = `${items.length} to-do${items.length === 1 ? '' : 's'}`;
+    const row = entry => `<article class="history-row todo-row"><p class="history-todo-copy">${escapeHtml(entry.text)}</p><div class="history-actions"><button type="button" class="history-icon-button" data-edit-todo="${entry.id}" aria-label="Edit to-do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg></button><button type="button" class="history-icon-button history-delete" data-delete-todo="${entry.id}" aria-label="Delete to-do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg></button></div></article>`;
     todoEntries.innerHTML = !items.length
       ? '<p class="empty">No to-dos yet. Add a note above to remember it for later.</p>'
-      : `${unfinished.length ? unfinished.map(row).join('') : '<p class="small">All caught up.</p>'}${completed.length ? `<h3 class="todo-completed-title">Completed (${completed.length})</h3>${completed.map(row).join('')}` : ''}`;
+      : items.map(row).join('');
   };
   const saveTodo = (entry, changes = {}) => {
     const updated = normalizeTodoRecord({
@@ -4524,20 +4525,19 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     renderHistory();
     return true;
   };
-  document.getElementById('todoForm').addEventListener('submit', event => {
+  const updateTodoAddButton = () => {
+    addTodo.classList.toggle('hidden', !todoText.value.trim());
+    syncHeaderAction();
+  };
+  todoText.addEventListener('input', updateTodoAddButton);
+  updateTodoAddButton();
+  todoForm.addEventListener('submit', event => {
     event.preventDefault();
     if (saveTodo({ text: todoText.value, createdAt: new Date().toISOString() })) {
       todoText.value = '';
+      updateTodoAddButton();
       todoText.focus();
     }
-  });
-  todoEntries.addEventListener('change', event => {
-    const checkbox = event.target.closest('[data-toggle-todo]');
-    if (!checkbox) return;
-    const entry = data.todos.find(item => item.id === checkbox.dataset.toggleTodo);
-    if (!entry || entry.deleted) return;
-    saveTodo(entry, { completed: checkbox.checked });
-    todoEntries.querySelector(`[data-toggle-todo="${entry.id}"]`)?.focus();
   });
   todoEntries.addEventListener('click', event => {
     const edit = event.target.closest('[data-edit-todo]');
