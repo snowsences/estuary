@@ -183,7 +183,9 @@ function normalizeExtraIncomeRecord(value, fallbackId = '') {
   if (value.updatedAt) entry.updatedAt = safeDateTime(value.updatedAt);
   return entry.amount > 0 ? entry : null;
 }
-function normalizeTodoRecord(value, fallbackId = '') {
+const estuaryTodoPrefix = 'estuary-todo-';
+const isEstuaryTodoId = id => /^estuary-todo-[A-Za-z0-9_-]{1,100}$/.test(String(id || ''));
+function normalizeTodoValue(value, fallbackId = '') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const text = safeText(value.text, 1000).trim();
   if (!text) return null;
@@ -196,6 +198,11 @@ function normalizeTodoRecord(value, fallbackId = '') {
     updatedAt: safeDateTime(value.updatedAt || value.createdAt),
     pendingSync: value.pendingSync === true,
   };
+}
+function normalizeTodoRecord(value, fallbackId = '') {
+  // The Firebase project has hosted other apps. Never treat their notes as budget reminders.
+  if (!isEstuaryTodoId(value?.id || fallbackId)) return null;
+  return normalizeTodoValue(value, fallbackId);
 }
 function normalizeInvestmentRecord(value, fallbackId = '') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -476,8 +483,15 @@ function normalizeAppData(value) {
     todos: Array.isArray(source.todos)
       ? source.todos.slice(0, 10000).map(entry => normalizeTodoRecord(entry)).filter(Boolean)
       : [],
+    // Keep ambiguous pre-isolation notes recoverable in encrypted backups, but never display or sync them.
+    legacyHistoryTodos: [
+      ...(Array.isArray(source.legacyHistoryTodos) ? source.legacyHistoryTodos : []),
+      ...(Array.isArray(source.todos) ? source.todos.filter(entry => !isEstuaryTodoId(entry?.id)) : []),
+    ].slice(0, 10000).map(entry => normalizeTodoValue(entry)).filter(Boolean)
+      .map(entry => ({ ...entry, pendingSync: false })),
     investments,
     investmentBalances: [...balanceMap.values()],
+
     accounts: Array.isArray(source.accounts)
       ? source.accounts
           .slice(0, 100)
@@ -962,7 +976,7 @@ function updateTodoSyncStatus() {
   status.textContent = message;
 }
 async function syncTodoRecord(entry) {
-  if (!firebaseClient || !firebaseUser || todoSyncInFlight.has(entry.id)) return;
+  if (!entry || !isEstuaryTodoId(entry.id) || !firebaseClient || !firebaseUser || todoSyncInFlight.has(entry.id)) return;
   const { pendingSync, ...record } = entry;
   todoSyncInFlight.add(entry.id);
   todoSyncFailures.delete(entry.id);
@@ -1274,8 +1288,8 @@ function subscribeFirebase() {
       firebaseTodosListenerFailed = false;
       updateTodoSyncStatus();
       if (snapshot.empty && snapshot.metadata.fromCache) return;
-      const merged = new Map(snapshot.docs.map(record => {
-        const entry = normalizeTodoRecord({ ...record.data(), pendingSync: false }, record.id);
+      const merged = new Map(snapshot.docs.filter(record => isEstuaryTodoId(record.id)).map(record => {
+        const entry = normalizeTodoRecord({ ...record.data(), id: record.id, pendingSync: false }, record.id);
         return [entry?.id, entry];
       }).filter(([, entry]) => entry));
       // Keep unsynced edits (including deletions) until Firebase has accepted them.
@@ -4498,7 +4512,8 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   };
   const saveTodo = (entry, changes = {}) => {
     const updated = normalizeTodoRecord({
-      ...entry, ...changes, updatedAt: new Date().toISOString(), pendingSync: true,
+      ...entry, ...changes, id: entry.id || `${estuaryTodoPrefix}${crypto.randomUUID()}`,
+      updatedAt: new Date().toISOString(), pendingSync: true,
     });
     if (!updated) return false;
     const index = data.todos.findIndex(item => item.id === updated.id);
