@@ -80,6 +80,7 @@ const starter = {
   })),
   entries: [],
   extraIncome: [],
+  todos: [],
   investments: [],
   investmentBalances: [],
   accounts: [],
@@ -181,6 +182,20 @@ function normalizeExtraIncomeRecord(value, fallbackId = '') {
   };
   if (value.updatedAt) entry.updatedAt = safeDateTime(value.updatedAt);
   return entry.amount > 0 ? entry : null;
+}
+function normalizeTodoRecord(value, fallbackId = '') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const text = safeText(value.text, 1000).trim();
+  if (!text) return null;
+  return {
+    id: safeId(value.id || fallbackId, 'todo'),
+    text,
+    completed: value.completed === true,
+    deleted: value.deleted === true,
+    createdAt: safeDateTime(value.createdAt),
+    updatedAt: safeDateTime(value.updatedAt || value.createdAt),
+    pendingSync: value.pendingSync === true,
+  };
 }
 function normalizeInvestmentRecord(value, fallbackId = '') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -457,6 +472,9 @@ function normalizeAppData(value) {
           .slice(0, 10000)
           .map(entry => normalizeExtraIncomeRecord(entry))
           .filter(Boolean)
+      : [],
+    todos: Array.isArray(source.todos)
+      ? source.todos.slice(0, 10000).map(entry => normalizeTodoRecord(entry)).filter(Boolean)
       : [],
     investments,
     investmentBalances: [...balanceMap.values()],
@@ -917,6 +935,36 @@ async function deleteCloudExtraIncome(entry) {
     );
   }
 }
+const todoSyncInFlight = new Set();
+async function syncTodoRecord(entry) {
+  if (!firebaseClient || !firebaseUser || todoSyncInFlight.has(entry.id)) return;
+  const { pendingSync, ...record } = entry;
+  todoSyncInFlight.add(entry.id);
+  try {
+    await firebaseClient.setDoc(
+      firebaseClient.doc(firebaseClient.db, ...firebasePath('todos'), entry.id),
+      record,
+    );
+    const current = data.todos.find(item => item.id === entry.id);
+    if (current && current.updatedAt === entry.updatedAt && current.text === entry.text &&
+        current.completed === entry.completed && current.deleted === entry.deleted) {
+      current.pendingSync = false;
+      save();
+    }
+  } catch (error) {
+    console.error(error);
+    firebaseStatusMessage('Could not sync this to-do yet. It remains saved on this device.');
+  } finally {
+    todoSyncInFlight.delete(entry.id);
+    const current = data.todos.find(item => item.id === entry.id);
+    if (current?.pendingSync && (current.updatedAt !== entry.updatedAt ||
+        current.text !== entry.text || current.completed !== entry.completed ||
+        current.deleted !== entry.deleted)) syncTodoRecord(current);
+  }
+}
+const syncPendingTodos = () => data.todos.filter(entry => entry.pendingSync).forEach(syncTodoRecord);
+window.addEventListener('online', syncPendingTodos);
+
 async function syncInvestmentRecord(entry) {
   if (!firebaseClient || !firebaseUser) return;
   try {
@@ -1065,6 +1113,7 @@ function subscribeFirebase() {
   const monthsRef = firebaseClient.collection(firebaseClient.db, ...firebasePath('months'));
   const entriesRef = firebaseClient.collection(firebaseClient.db, ...firebasePath('expenses'));
   const extraIncomeRef = firebaseClient.collection(firebaseClient.db, ...firebasePath('extraIncome'));
+  const todosRef = firebaseClient.collection(firebaseClient.db, ...firebasePath('todos'));
   const investmentsRef = firebaseClient.collection(firebaseClient.db, ...firebasePath('investments'));
   const investmentBalancesRef = firebaseClient.collection(
     firebaseClient.db,
@@ -1184,6 +1233,24 @@ function subscribeFirebase() {
     }),
   );
   firebaseUnsubscribers.push(
+    firebaseClient.onSnapshot(todosRef, snapshot => {
+      if (snapshot.empty && snapshot.metadata.fromCache) return;
+      const merged = new Map(snapshot.docs.map(record => {
+        const entry = normalizeTodoRecord({ ...record.data(), pendingSync: false }, record.id);
+        return [entry?.id, entry];
+      }).filter(([, entry]) => entry));
+      // Keep unsynced edits (including deletions) until Firebase has accepted them.
+      data.todos.filter(entry => entry.pendingSync).forEach(entry => merged.set(entry.id, entry));
+      data.todos = [...merged.values()];
+      save();
+      renderHistory();
+      if (!snapshot.metadata.fromCache) syncPendingTodos();
+    }, error => {
+      console.error(error);
+      firebaseStatusMessage('Could not sync To-do. Your notes are still saved on this device.');
+    }),
+  );
+  firebaseUnsubscribers.push(
     firebaseClient.onSnapshot(investmentsRef, snapshot => {
       if (snapshot.empty && snapshot.metadata.fromCache) return;
       const migrated = [];
@@ -1283,6 +1350,7 @@ async function onFirebaseUser(user) {
     await loadFinanceNotes();
     await loadInvestmentSettings();
     subscribeFirebase();
+    syncPendingTodos();
     firebaseStatusMessage(
       moved
         ? 'Local budget moved to Firebase and now syncing.'
@@ -2462,6 +2530,7 @@ async function restoreBackup(event) {
     )
       return;
     data = normalizeAppData(restored);
+    data.todos.forEach(entry => { entry.pendingSync = true; });
     ensureYear(currentYear);
     ensureYear(currentYear + 1);
     data.months.sort((a, b) => a.id.localeCompare(b.id));
@@ -2482,6 +2551,7 @@ async function restoreBackup(event) {
       }),
     );
     await Promise.all(data.extraIncome.map(syncExtraIncomeRecord));
+    await Promise.all(data.todos.map(syncTodoRecord));
     await Promise.all(data.investments.map(syncInvestmentRecord));
     render();
     alert('Backup restored.');
@@ -4278,6 +4348,12 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   const historyHead = historySection?.querySelector('.history-head');
   const historyEntriesEl = document.getElementById('historyEntries');
   const historyCountEl = document.getElementById('historyCount');
+  const todosPanel = document.getElementById('historyTodos');
+  const todoEntries = document.getElementById('todoEntries');
+  const todoText = document.getElementById('todoText');
+  const todoDialog = document.getElementById('todoDialog');
+  const todoEditText = document.getElementById('todoEditText');
+  let editingTodoId = '';
   const extraIncomeDialog = document.getElementById('extraIncomeDialog');
   const extraIncomeForm = document.getElementById('extraIncomeForm');
   const extraIncomeAmount = document.getElementById('extraIncomeAmount');
@@ -4328,8 +4404,11 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   const syncHeaderAction = () => {
     if (!headerAction) return;
     const addsIncome = mainHistoryIsActive() && historyView === 'income';
-    headerAction.textContent = addsIncome ? '+ Add extra income' : '+ Add expense';
-    headerAction.onclick = addsIncome ? () => openExtraIncome() : openExpenseAction;
+    const addsTodo = mainHistoryIsActive() && historyView === 'todos';
+    headerAction.textContent = addsTodo ? '+ Add to-do' : addsIncome ? '+ Add extra income' : '+ Add expense';
+    headerAction.onclick = addsTodo
+      ? () => { todoText.scrollIntoView({ block: 'center' }); todoText.focus(); }
+      : addsIncome ? () => openExtraIncome() : openExpenseAction;
   };
   const setupHistoryTabs = () => {
     if (!historySection || document.getElementById('historyViewControls')) return;
@@ -4338,7 +4417,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     controls.id = 'historyViewControls';
     controls.className = 'history-view-controls';
     controls.innerHTML =
-      '<div class="history-view-tabs" role="tablist" aria-label="History type"><button type="button" class="history-view-tab active" data-history-view="expenses" role="tab" aria-selected="true">Expenses</button><button type="button" class="history-view-tab" data-history-view="income" role="tab" aria-selected="false">Extra Income</button></div>';
+      '<div class="history-view-tabs" role="tablist" aria-label="History type"><button type="button" class="history-view-tab active" data-history-view="expenses" role="tab" aria-selected="true">Expenses</button><button type="button" class="history-view-tab" data-history-view="income" role="tab" aria-selected="false">Extra Income</button><button type="button" class="history-view-tab" data-history-view="todos" role="tab" aria-selected="false">To-do</button></div>';
     historyHead?.insertAdjacentElement('afterend', controls);
     controls.addEventListener('click', event => {
       const tab = event.target.closest('[data-history-view]');
@@ -4355,8 +4434,75 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       button.setAttribute('aria-selected', String(selected));
     });
     document.getElementById('historyFilters')?.classList.toggle('hidden', historyView !== 'expenses');
+    historyEntriesEl.classList.toggle('hidden', historyView === 'todos');
+    todosPanel.classList.toggle('hidden', historyView !== 'todos');
     syncHeaderAction();
   };
+  const renderTodos = () => {
+    const items = data.todos.filter(entry => !entry.deleted).sort((a, b) =>
+      String(b.createdAt).localeCompare(String(a.createdAt)),
+    );
+    const unfinished = items.filter(entry => !entry.completed);
+    const completed = items.filter(entry => entry.completed);
+    historyCountEl.textContent = `${unfinished.length} to do · ${completed.length} completed`;
+    const row = entry => `<article class="history-row todo-row${entry.completed ? ' todo-completed' : ''}"><label class="history-todo-check"><input type="checkbox" data-toggle-todo="${entry.id}" ${entry.completed ? 'checked' : ''}><span>${escapeHtml(entry.text)}</span></label><div class="history-actions"><button type="button" class="history-icon-button" data-edit-todo="${entry.id}" aria-label="Edit to-do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.4-10.4a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z"/><path d="m13.9 7.2 3 3"/></svg></button><button type="button" class="history-icon-button history-delete" data-delete-todo="${entry.id}" aria-label="Delete to-do"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M9 7l.7-3h4.6L15 7m-8 0 1 13h8l1-13"/></svg></button></div></article>`;
+    todoEntries.innerHTML = !items.length
+      ? '<p class="empty">No to-dos yet. Add a note above to remember it for later.</p>'
+      : `${unfinished.length ? unfinished.map(row).join('') : '<p class="small">All caught up.</p>'}${completed.length ? `<h3 class="todo-completed-title">Completed (${completed.length})</h3>${completed.map(row).join('')}` : ''}`;
+  };
+  const saveTodo = (entry, changes = {}) => {
+    const updated = normalizeTodoRecord({
+      ...entry, ...changes, updatedAt: new Date().toISOString(), pendingSync: true,
+    });
+    if (!updated) return false;
+    const index = data.todos.findIndex(item => item.id === updated.id);
+    if (index < 0) data.todos.unshift(updated);
+    else data.todos[index] = updated;
+    save();
+    syncTodoRecord(updated);
+    renderHistory();
+    return true;
+  };
+  document.getElementById('todoForm').addEventListener('submit', event => {
+    event.preventDefault();
+    if (saveTodo({ text: todoText.value, createdAt: new Date().toISOString() })) {
+      todoText.value = '';
+      todoText.focus();
+    }
+  });
+  todoEntries.addEventListener('change', event => {
+    const checkbox = event.target.closest('[data-toggle-todo]');
+    if (!checkbox) return;
+    const entry = data.todos.find(item => item.id === checkbox.dataset.toggleTodo);
+    if (!entry || entry.deleted) return;
+    saveTodo(entry, { completed: checkbox.checked });
+    todoEntries.querySelector(`[data-toggle-todo="${entry.id}"]`)?.focus();
+  });
+  todoEntries.addEventListener('click', event => {
+    const edit = event.target.closest('[data-edit-todo]');
+    const remove = event.target.closest('[data-delete-todo]');
+    if (!edit && !remove) return;
+    const entry = data.todos.find(item => item.id === (edit?.dataset.editTodo || remove.dataset.deleteTodo));
+    if (!entry || entry.deleted) return;
+    if (remove) {
+      if (confirm('Delete this to-do?')) saveTodo(entry, { deleted: true });
+      return;
+    }
+    editingTodoId = entry.id;
+    todoEditText.value = entry.text;
+    todoDialog.showModal();
+    todoEditText.focus();
+  });
+  document.getElementById('closeTodo').onclick = () => todoDialog.close();
+  document.getElementById('cancelTodo').onclick = () => todoDialog.close();
+  todoDialog.addEventListener('click', event => {
+    if (event.target === todoDialog) todoDialog.close();
+  });
+  document.getElementById('todoEditForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const entry = data.todos.find(item => item.id === editingTodoId && !item.deleted);
+    if (entry && saveTodo(entry, { text: todoEditText.value })) todoDialog.close();
+  });
   const renderExtraIncomeHistory = () => {
     const legacyEntries = data.months
       .filter(month => num(month.cashOffset) > 0)
@@ -4400,7 +4546,8 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   renderHistory = () => {
     setupHistoryTabs();
     if (historyView === 'expenses') priorHistoryRender();
-    else renderExtraIncomeHistory();
+    else if (historyView === 'income') renderExtraIncomeHistory();
+    else renderTodos();
     if (historyHead?.querySelector('h2')) historyHead.querySelector('h2').textContent = 'History';
     updateHistoryControls();
   };

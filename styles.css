@@ -3579,7 +3579,7 @@ body:not(.auth-locked) #authGate {
   }
   .history-view-tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .extra-income-dialog {
     position: fixed;
@@ -5108,5 +5108,93 @@ dialog .dialog-inner,
   #months .monthly-table td {
     padding-top: 8px !important;
     padding-bottom: 8px !important;
+  }
+}
+
+/* Independent checklist in History. */
+.history-todo-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: end;
+}
+.history-todo-form label {
+  grid-column: 1 / -1;
+  font-weight: 700;
+}
+.history-todo-form textarea,
+#todoEditText {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+.history-todo-form textarea::placeholder {
+  color: var(--muted);
+}
+.history-todo-form textarea:focus,
+#todoEditText:focus {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+.history-todo-form + p {
+  margin: 12px 0 20px;
+  color: var(--muted);
+}
+.todo-edit-label {
+  display: block;
+  margin: 20px 0 8px;
+  font-weight: 700;
+}
+.history-row.todo-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 10px 8px 10px 14px;
+}
+.history-todo-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 36px;
+  cursor: pointer;
+}
+.history-todo-check input {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+.history-todo-check span {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.todo-completed .history-todo-check span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.todo-completed-title {
+  margin: 20px 0 4px;
+  color: var(--muted);
+  font-size: 15px;
+}
+@media (max-width: 450px) {
+  .history-view-tab {
+    padding-inline: 6px;
+    font-size: 14px;
+  }
+  .history-todo-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .history-todo-form .button {
+    justify-self: end;
   }
 }

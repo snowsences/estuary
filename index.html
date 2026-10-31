@@ -21,7 +21,7 @@
       rel="stylesheet"
     />
     <title>Estuary</title>
-    <meta name="estuary-release" content="128" />
+    <meta name="estuary-release" content="129" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="auth-locked">
@@ -91,6 +91,16 @@
           <span id="historyCount"></span>
         </div>
         <div class="history-list" id="historyEntries"></div>
+        <div id="historyTodos" class="hidden">
+          <form id="todoForm" class="history-todo-form">
+            <label for="todoText">Leave yourself a note</label>
+            <textarea id="todoText" maxlength="1000" rows="2" required
+              placeholder="e.g. Add the grocery receipt from yesterday"></textarea>
+            <button type="submit" class="button primary">+ Add to-do</button>
+          </form>
+          <p class="small">Keep reminders here, then check them off when you’re done.</p>
+          <div id="todoEntries" class="history-list"></div>
+        </div>
       </section>
       <section id="investments" class="hidden">
         <div class="investment-summary" id="investmentSummary"></div>
@@ -192,6 +202,18 @@
           ><button class="button primary" id="saveExpense">Add expense</button>
         </div>
       </div>
+    </dialog>
+    <dialog id="todoDialog" class="extra-income-dialog" aria-labelledby="todoDialogTitle">
+      <form id="todoEditForm" class="dialog-inner">
+        <button type="button" class="dialog-close" id="closeTodo" aria-label="Close to-do dialog">×</button>
+        <h2 id="todoDialogTitle">Edit to-do</h2>
+        <label class="todo-edit-label" for="todoEditText">Note</label>
+        <textarea id="todoEditText" maxlength="1000" rows="5" required></textarea>
+        <div class="toolbar modal-actions">
+          <button type="button" class="button ghost" id="cancelTodo">Cancel</button>
+          <button type="submit" class="button primary">Save changes</button>
+        </div>
+      </form>
     </dialog>
     <dialog id="extraIncomeDialog" class="extra-income-dialog">
       <form class="dialog-inner" id="extraIncomeForm">
