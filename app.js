@@ -936,10 +936,37 @@ async function deleteCloudExtraIncome(entry) {
   }
 }
 const todoSyncInFlight = new Set();
+const todoSyncFailures = new Set();
+let firebaseTodosConfirmed = false,
+  firebaseTodosListenerFailed = false;
+function updateTodoSyncStatus() {
+  const status = document.getElementById('todoSyncStatus');
+  if (!status) return;
+  const pending = data.todos.some(entry => entry.pendingSync);
+  let state = 'pending', message = 'Connecting to Firebase…';
+  if (!firebaseUser || firebaseUser.uid !== ownerUid) {
+    state = 'local';
+    message = 'Saved on this device. Sign in to sync with Firebase.';
+  } else if (todoSyncFailures.size || firebaseTodosListenerFailed) {
+    state = 'error';
+    message = 'Could not sync with Firebase. Your notes are still saved on this device.';
+  } else if (!navigator.onLine) {
+    message = 'Offline. Your notes are saved on this device and will sync when you reconnect.';
+  } else if (pending) {
+    message = 'Saved on this device. Syncing with Firebase…';
+  } else if (firebaseTodosConfirmed) {
+    state = 'saved';
+    message = 'Saved to Firebase. Changes sync across your devices.';
+  }
+  status.dataset.state = state;
+  status.textContent = message;
+}
 async function syncTodoRecord(entry) {
   if (!firebaseClient || !firebaseUser || todoSyncInFlight.has(entry.id)) return;
   const { pendingSync, ...record } = entry;
   todoSyncInFlight.add(entry.id);
+  todoSyncFailures.delete(entry.id);
+  updateTodoSyncStatus();
   try {
     await firebaseClient.setDoc(
       firebaseClient.doc(firebaseClient.db, ...firebasePath('todos'), entry.id),
@@ -953,9 +980,11 @@ async function syncTodoRecord(entry) {
     }
   } catch (error) {
     console.error(error);
+    todoSyncFailures.add(entry.id);
     firebaseStatusMessage('Could not sync this to-do yet. It remains saved on this device.');
   } finally {
     todoSyncInFlight.delete(entry.id);
+    updateTodoSyncStatus();
     const current = data.todos.find(item => item.id === entry.id);
     if (current?.pendingSync && (current.updatedAt !== entry.updatedAt ||
         current.text !== entry.text || current.completed !== entry.completed ||
@@ -963,7 +992,11 @@ async function syncTodoRecord(entry) {
   }
 }
 const syncPendingTodos = () => data.todos.filter(entry => entry.pendingSync).forEach(syncTodoRecord);
-window.addEventListener('online', syncPendingTodos);
+window.addEventListener('online', () => {
+  syncPendingTodos();
+  updateTodoSyncStatus();
+});
+window.addEventListener('offline', updateTodoSyncStatus);
 
 async function syncInvestmentRecord(entry) {
   if (!firebaseClient || !firebaseUser) return;
@@ -1099,6 +1132,9 @@ function reconcileCurrentMonthGroceriesFromHistory() {
 }
 function subscribeFirebase() {
   stopFirebaseListeners();
+  firebaseTodosConfirmed = false;
+  firebaseTodosListenerFailed = false;
+  updateTodoSyncStatus();
   firebaseSettingsReady = false;
   firebaseMonthsReady = false;
   firebaseMonthsConfirmed = false;
@@ -1233,7 +1269,10 @@ function subscribeFirebase() {
     }),
   );
   firebaseUnsubscribers.push(
-    firebaseClient.onSnapshot(todosRef, snapshot => {
+    firebaseClient.onSnapshot(todosRef, { includeMetadataChanges: true }, snapshot => {
+      firebaseTodosConfirmed = !snapshot.metadata.fromCache;
+      firebaseTodosListenerFailed = false;
+      updateTodoSyncStatus();
       if (snapshot.empty && snapshot.metadata.fromCache) return;
       const merged = new Map(snapshot.docs.map(record => {
         const entry = normalizeTodoRecord({ ...record.data(), pendingSync: false }, record.id);
@@ -1247,6 +1286,8 @@ function subscribeFirebase() {
       if (!snapshot.metadata.fromCache) syncPendingTodos();
     }, error => {
       console.error(error);
+      firebaseTodosListenerFailed = true;
+      updateTodoSyncStatus();
       firebaseStatusMessage('Could not sync To-do. Your notes are still saved on this device.');
     }),
   );
@@ -1328,6 +1369,10 @@ function clearPrivateLocalData() {
 }
 async function onFirebaseUser(user) {
   firebaseUser = user;
+  firebaseTodosConfirmed = false;
+  firebaseTodosListenerFailed = false;
+  todoSyncFailures.clear();
+  updateTodoSyncStatus();
   if (!user) {
     stopFirebaseListeners();
     if (clearPrivateDataAfterAuthChange) {
@@ -4436,6 +4481,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     document.getElementById('historyFilters')?.classList.toggle('hidden', historyView !== 'expenses');
     historyEntriesEl.classList.toggle('hidden', historyView === 'todos');
     todosPanel.classList.toggle('hidden', historyView !== 'todos');
+    updateTodoSyncStatus();
     syncHeaderAction();
   };
   const renderTodos = () => {
