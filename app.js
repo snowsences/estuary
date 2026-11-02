@@ -1731,6 +1731,60 @@ const notesDialog = document.getElementById('notesDialog'),
 function updateNotesCount() {
   notesCount.textContent = `${notesText.value.length} / 500`;
 }
+// Monthly Spending is an independently stored balance, not a fresh sum of History.
+// Reconcile it without inventing an opening balance or changing financial records.
+function spendingBreakdown(month, source = data) {
+  const cents = value => Math.round(num(value) * 100);
+  const expenses = source.entries
+    .filter(entry => entry.month === month.id && entry.type === 'Spending')
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const income = source.extraIncome
+    .filter(entry => entry.month === month.id)
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const expenseCents = expenses.reduce((sum, entry) => sum + cents(entry.final), 0);
+  const incomeCents = income.reduce((sum, entry) => sum + cents(entry.amount), 0);
+  const recordedCents = expenseCents - incomeCents;
+  const displayedCents = cents(month.spending);
+  return { expenses, income, expenseCents, incomeCents, recordedCents, displayedCents,
+    differenceCents: displayedCents - recordedCents };
+}
+function spendingCalculationHtml(month, source = data) {
+  const result = spendingBreakdown(month, source);
+  const amount = cents => money(cents / 100);
+  const signed = cents => `${cents < 0 ? '−' : '+'}${amount(Math.abs(cents))}`;
+  const dateLabel = entry => {
+    const date = new Date(entry.createdAt);
+    return Number.isFinite(date.getTime())
+      ? `Entered ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : 'Entry date unavailable';
+  };
+  const rows = (entries, isIncome) => entries.map(entry => {
+    const modifier = num(entry.modifier);
+    const calculation = !isIncome && modifier !== 1
+      ? `${money(entry.original)} × ${modifier.toFixed(2)} = ${money(entry.final)} (rounded to cents)` : '';
+    return `<li><div><b>${escapeHtml(isIncome ? entry.category || 'Extra income' : expenseLabel(entry))}</b>${entry.comment || entry.description ? `<p>${escapeHtml(isIncome ? entry.description : entry.comment)}</p>` : ''}<small>${escapeHtml(dateLabel(entry))}</small>${calculation ? `<small>${escapeHtml(calculation)}</small>` : ''}</div><strong>${isIncome ? '−' : '+'}${money(isIncome ? entry.amount : entry.final)}</strong></li>`;
+  }).join('');
+  const hasDifference = result.differenceCents !== 0;
+  return `<h3>How Spending is calculated</h3>
+    <p class="spending-calculation-help">For ${escapeHtml(month.label)}, using the budget month assigned to each entry. Dining, Shopping and Travel count toward Spending; groceries, utilities and fixed bills are separate.</p>
+    <div class="spending-equation" aria-label="Spending equation">${amount(result.expenseCents)} − ${amount(result.incomeCents)}${hasDifference ? ` ${signed(result.differenceCents)}` : ''} = <b>${amount(result.displayedCents)}</b></div>
+    <dl class="spending-calculation-summary">
+      <div><dt>Recorded expenses</dt><dd>${amount(result.expenseCents)}</dd></div>
+      <div><dt>Less extra income</dt><dd>−${amount(result.incomeCents)}</dd></div>
+      <div><dt>Total explained by History</dt><dd>${amount(result.recordedCents)}</dd></div>
+      ${hasDifference ? `<div class="spending-unexplained"><dt>Unexplained difference</dt><dd>${signed(result.differenceCents)}</dd></div>` : ''}
+      <div class="spending-calculation-total"><dt>Spending shown in Months</dt><dd>${amount(result.displayedCents)}</dd></div>
+    </dl>
+    <p class="spending-reconciliation ${hasDifference ? 'has-difference' : ''}">${hasDifference ? `The stored total differs from recorded History by ${amount(Math.abs(result.differenceCents))}. This may be an imported or manually entered amount, missing history, or a sync discrepancy. The available records do not establish its source, so the total cannot be fully verified.` : 'The displayed total matches the recorded expenses minus extra income.'} Based on the data currently loaded; this view does not change any amounts.</p>
+    <details class="spending-calculation-items" open><summary>Expenses · ${result.expenses.length} · ${amount(result.expenseCents)}</summary><ul>${rows(result.expenses, false) || '<li>No recorded Spending expenses for this month.</li>'}</ul></details>
+    <details class="spending-calculation-items"${result.income.length ? ' open' : ''}><summary>Extra income deducted · ${result.income.length} · ${amount(result.incomeCents)}</summary><ul>${rows(result.income, true) || '<li>No recorded extra income for this month.</li>'}</ul></details>
+    ${num(month.cashOffset) ? `<p class="spending-calculation-help">Legacy cash offset: ${money(month.cashOffset)}. This affects Savings through fixed expenses and is not deducted from this Spending figure.</p>` : ''}`;
+}
+function renderSpendingCalculation(monthId) {
+  const month = data.months.find(item => item.id === monthId);
+  const panel = document.getElementById('notesExtraIncome');
+  if (month && panel) panel.innerHTML = spendingCalculationHtml(month);
+}
 function appendExpenseCommentToNotes(month, entry) {
   const item = `• ${money(entry.final)} — ${entry.comment}`,
     existing = String(month.notes || '').trim(),
@@ -1746,11 +1800,12 @@ function openNotes(monthId) {
   const month = data.months.find(item => item.id === monthId);
   if (!month) return;
   notesMonthId = monthId;
-  document.getElementById('notesTitle').textContent = `Notes · ${month.label}`;
+  document.getElementById('notesTitle').textContent = `Notes & calculation · ${month.label}`;
   notesText.value = String(month.notes || '').slice(0, 500);
   updateNotesCount();
   notesDialog.showModal();
-  notesText.focus();
+  notesText.focus({ preventScroll: true });
+  notesDialog.scrollTop = 0;
 }
 notesText.oninput = () => {
   if (notesText.value.length > 500) notesText.value = notesText.value.slice(0, 500);
@@ -4616,20 +4671,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   addCashOffset = monthId => openExtraIncome(monthId);
   openNotes = monthId => {
     priorOpenNotes(monthId);
-    const panel = document.getElementById('notesExtraIncome');
-    const entries = incomeForMonth(monthId);
-    const legacyAmount = num(data.months.find(month => month.id === monthId)?.cashOffset);
-    const rows = [
-      ...entries.map(
-        entry =>
-          `<div><span>${entry.category}</span><strong>+${money(entry.amount)}</strong>${entry.description ? `<small>${escapeHtml(entry.description)}</small>` : ''}</div>`,
-      ),
-      ...(legacyAmount > 0
-        ? [`<div><span>Legacy extra income</span><strong>+${money(legacyAmount)}</strong></div>`]
-        : []),
-    ];
-    panel.classList.toggle('hidden', !rows.length);
-    panel.innerHTML = rows.length ? `<p class="eyebrow">EXTRA INCOME</p>${rows.join('')}` : '';
+    renderSpendingCalculation(monthId);
   };
 
   document.getElementById('extraIncomeCategories')?.addEventListener('click', event => {
@@ -4708,11 +4750,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
         incomeForMonth(monthId).length > 0 ||
         num(data.months.find(month => month.id === monthId)?.cashOffset) > 0;
       if (hasExtraIncome) button.classList.add('has-notes');
-      button.title =
-        hasExtraIncome || data.months.find(month => month.id === monthId)?.notes
-          ? 'View notes and extra income'
-          : 'Add notes';
+      button.title = 'View spending calculation and notes';
+      button.setAttribute('aria-label', `View spending calculation and notes for ${data.months.find(month => month.id === monthId)?.label || monthId}`);
     });
+    if (notesDialog.open) renderSpendingCalculation(notesMonthId);
     syncHeaderAction();
   });
   render();

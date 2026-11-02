@@ -1353,6 +1353,64 @@ textarea,
 .notes-dialog .dialog-inner {
   padding: 24px;
 }
+.notes-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.notes-spending-calculation {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.notes-spending-calculation h3 { margin: 0 0 8px; font-size: 17px; }
+.spending-calculation-help, .spending-reconciliation {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.spending-equation {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.spending-calculation-summary { margin: 0; }
+.spending-calculation-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+}
+.spending-calculation-summary dd {
+  margin: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.spending-calculation-total { border-top: 1px solid var(--line); font-weight: 700; }
+.spending-unexplained { font-weight: 700; }
+.spending-reconciliation { padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.spending-reconciliation.has-difference { border-color: var(--orange); color: var(--ink); }
+.spending-calculation-items { border-top: 1px solid var(--line); margin-top: 12px; }
+.spending-calculation-items summary { padding: 12px 0; cursor: pointer; font-weight: 600; }
+.spending-calculation-items ul { list-style: none; padding: 0; margin: 0; }
+.spending-calculation-items li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.spending-calculation-items li > div { min-width: 0; overflow-wrap: anywhere; }
+.spending-calculation-items li > strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.spending-calculation-items p { margin: 4px 0; white-space: pre-wrap; }
+.spending-calculation-items small { display: block; color: var(--muted); margin-top: 4px; }
 .notes-dialog textarea {
   display: block;
   width: 100%;
