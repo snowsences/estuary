@@ -3,6 +3,7 @@ const localKeys = {
     displayMode: 'estuary-display-mode',
     firebaseConfig: 'estuary-firebase-config',
     pkce: 'estuary-pkce',
+    rollingAverage: 'estuary-rolling-average',
     theme: 'estuary-theme',
   },
   legacyPrefix = ['cream', 'corn'].join('-');
@@ -1639,7 +1640,9 @@ themeSettingsToggle.onclick = () => {
   updateThemeButton();
 };
 let chartRange = '2',
-  billMetric = 'water';
+  billMetric = 'water',
+  showRollingAverage = localStorage.getItem(localKeys.rollingAverage) !== 'off';
+const chartSeriesLabel = () => (showRollingAverage ? '3-month rolling average' : 'Monthly values');
 function currentMonthKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1671,6 +1674,16 @@ document.addEventListener('click', event => {
     renderCharts();
   }
 });
+chartArea.addEventListener('change', event => {
+  if (event.target.id !== 'chartRollingAverage') return;
+  const restoreFocus = document.activeElement === event.target;
+  showRollingAverage = event.target.checked;
+  localStorage.setItem(localKeys.rollingAverage, showRollingAverage ? 'on' : 'off');
+  hideChartTooltip();
+  renderCharts();
+  if (restoreFocus) document.getElementById('chartRollingAverage').focus({ preventScroll: true });
+  playEntrance(document.getElementById('overview'));
+});
 afterRender(() => renderHistory());
 render();
 document.getElementById('closeExpense').onclick = () => dialog.close();
@@ -1678,7 +1691,7 @@ function rollingAverage(points, window = 3) {
   return points.map((point, index) => {
     const slice = points.slice(Math.max(0, index - window + 1), index + 1),
       average = slice.reduce((sum, item) => sum + item.value, 0) / slice.length;
-    return { ...point, average: round(average) };
+    return round(average);
   });
 }
 function renderCharts() {
@@ -1692,7 +1705,7 @@ function renderCharts() {
       savings: months.map(month => ({ label: month.label, value: total(month).saved })),
     },
     rangeLabel = chartRange === 'all' ? 'All time' : `${chartRange} years`;
-  chartArea.innerHTML = `<div class="chart-controls"><h2>Cost over time</h2><div class="chart-tabs">${[
+  chartArea.innerHTML = `<div class="chart-controls"><h2>Cost over time</h2><div class="chart-options"><div class="chart-tabs">${[
     ['2', '2 yrs'],
     ['5', '5 yrs'],
     ['all', 'All time'],
@@ -1701,7 +1714,7 @@ function renderCharts() {
       ([value, label]) =>
         `<button class="${chartRange === value ? 'selected' : ''}" data-chart-range="${value}">${label}</button>`,
     )
-    .join('')}</div></div><div class="chart-grid">${chartCard(
+    .join('')}</div><label class="chart-average-toggle"><span>Rolling Average</span><span class="display-switch"><input id="chartRollingAverage" type="checkbox" role="switch"${showRollingAverage ? ' checked' : ''}><i aria-hidden="true"></i></span></label></div></div><div class="chart-grid">${chartCard(
     'Bills',
     series[billMetric],
     '#45b8b0',
@@ -1719,10 +1732,11 @@ function renderCharts() {
 }
 render();
 function chartCard(title, points, color, extra = '') {
-  const palette = { '#45b8b0': '#35b9b1', '#e2ad4c': '#efb43b', '#f0845c': '#4d96b7', '#b28ad5': '#779fc2' },
-    smoothed = rollingAverage(points),
-    latest = smoothed.at(-1);
-  return `<article class="chart-card"><div class="chart-card-head"><div><h3>${title}</h3><p class="chart-subtitle">3-month rolling average</p></div>${extra}</div><p class="chart-value">Latest: ${money(latest?.value || 0)}</p>${chartSvg(smoothed, palette[color] || color)}</article>`;
+  const palette = { '#45b8b0': '#35b9b1', '#e2ad4c': '#efb43b', '#f0845c': '#4d96b7', '#b28ad5': '#779fc2' };
+  const values = showRollingAverage ? rollingAverage(points) : points.map(point => point.value);
+  const latest = points.at(-1);
+  const average = points.length ? points.reduce((sum, point) => sum + num(point.value), 0) / points.length : 0;
+  return `<article class="chart-card"><div class="chart-card-head"><div><h3>${title}</h3><p class="chart-subtitle">${chartSeriesLabel()}</p></div><div class="chart-card-actions"><span class="chart-average">Avg ${money(average)}</span>${extra}</div></div><p class="chart-value">Latest: ${money(latest?.value || 0)}</p>${chartSvg(points, palette[color] || color, values)}</article>`;
 }
 let notesMonthId = '';
 const notesDialog = document.getElementById('notesDialog'),
@@ -1846,7 +1860,7 @@ function trendPoints(values) {
     intercept = meanY - slope * meanX;
   return [intercept, intercept + slope * (count - 1)];
 }
-function chartSvg(points, color) {
+function chartSvg(points, color, values) {
   if (!points.length) return '<div class="chart-empty">No monthly data yet.</div>';
   const width = 520,
     height = 220,
@@ -1856,7 +1870,6 @@ function chartSvg(points, color) {
     bottom = 42,
     plotWidth = width - left - right,
     plotHeight = height - top - bottom,
-    values = points.map(point => point.average),
     trend = trendPoints(values),
     min = Math.min(0, ...values, ...trend),
     max = Math.max(0, ...values, ...trend),
@@ -1865,13 +1878,13 @@ function chartSvg(points, color) {
     y = value => top + ((max - value) * plotHeight) / range,
     yTicks = [max, round((max + min) / 2), min],
     xIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])],
-    path = points
-      .map((point, index) => `${index ? 'L' : 'M'} ${x(index).toFixed(1)} ${y(point.average).toFixed(1)}`)
+    path = values
+      .map((value, index) => `${index ? 'L' : 'M'} ${x(index).toFixed(1)} ${y(value).toFixed(1)}`)
       .join(' '),
     trendPath = trend.length
       ? `M ${x(0).toFixed(1)} ${y(trend[0]).toFixed(1)} L ${x(points.length - 1).toFixed(1)} ${y(trend[1]).toFixed(1)}`
       : '';
-  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Three-month rolling average chart with trend line">${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<line class="chart-axis" x1="${left}" x2="${width - right}" y1="${height - bottom}" y2="${height - bottom}"/><path d="${trendPath}" fill="none" stroke="${color}" stroke-opacity=".5" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(point.average)}" r="3.5" fill="${color}"/><circle class="chart-point" data-chart-label="${point.label}" data-chart-value="${money(point.value)}" data-chart-average="${money(point.average)}" cx="${x(index)}" cy="${y(point.average)}" r="13" fill="${color}" fill-opacity=".001"/></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${height - bottom}" y2="${height - bottom + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
+  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${chartSeriesLabel()} chart with trend line">${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<line class="chart-axis" x1="${left}" x2="${width - right}" y1="${height - bottom}" y2="${height - bottom}"/><path d="${trendPath}" fill="none" stroke="${color}" stroke-opacity=".5" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(values[index])}" r="3.5" fill="${color}"/><circle class="chart-point" data-chart-label="${point.label}" data-chart-value="${money(point.value)}"${showRollingAverage ? ` data-chart-average="${money(values[index])}"` : ''} cx="${x(index)}" cy="${y(values[index])}" r="13" fill="${color}" fill-opacity=".001"/></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${height - bottom}" y2="${height - bottom + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
 }
 function savedTone(value) {
   return value > 4000
@@ -1904,7 +1917,8 @@ function hideChartTooltip() {
   chartTooltip.classList.remove('visible');
 }
 function showChartTooltip(point, event) {
-  chartTooltip.innerHTML = `<b>${point.dataset.chartLabel}</b><span>${point.dataset.chartValue}</span><span>3-month average: ${point.dataset.chartAverage}</span>`;
+  const { chartLabel, chartValue, chartAverage } = point.dataset;
+  chartTooltip.innerHTML = `<b>${escapeHtml(chartLabel)}</b><span>${escapeHtml(chartValue)}</span>${chartAverage ? `<span>3-month average: ${escapeHtml(chartAverage)}</span>` : ''}`;
   const gap = 14,
     width = chartTooltip.offsetWidth,
     height = chartTooltip.offsetHeight,
@@ -3404,21 +3418,6 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   // Light is the default only for devices that have not explicitly chosen a theme.
   if (!localStorage.getItem(localKeys.theme)) applyTheme('light');
 
-  chartCard = function (title, points, color, extra = '') {
-    const palette = {
-      '#45b8b0': '#35b9b1',
-      '#e2ad4c': '#efb43b',
-      '#f0845c': '#4d96b7',
-      '#b28ad5': '#779fc2',
-    };
-    const smoothed = rollingAverage(points);
-    const latest = smoothed.at(-1);
-    const average = points.length
-      ? points.reduce((sum, point) => sum + num(point.value), 0) / points.length
-      : 0;
-    return `<article class="chart-card"><div class="chart-card-head"><div><h3>${title}</h3><p class="chart-subtitle">3-month rolling average</p></div><div class="chart-card-actions"><span class="chart-average">Avg ${money(average)}</span>${extra}</div></div><p class="chart-value">Latest: ${money(latest?.value || 0)}</p>${chartSvg(smoothed, palette[color] || color)}</article>`;
-  };
-
   const categoryPalette = { groceries: '#efb43b', dining: '#78b575', spending: '#4d96b7' };
   const categoryMonths = () =>
     chartMonths().map(month => {
@@ -3772,7 +3771,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     return path;
   };
 
-  chartSvg = (points, color) => {
+  chartSvg = (points, color, values) => {
     if (!points.length) return '<div class="chart-empty">No monthly data yet.</div>';
     const width = 520,
       height = 220,
@@ -3782,8 +3781,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       bottom = 42;
     const plotWidth = width - left - right,
       plotHeight = height - top - bottom;
-    const values = points.map(point => point.average),
-      trend = trendPoints(values);
+    const trend = trendPoints(values);
     const min = Math.min(0, ...values, ...trend),
       max = Math.max(0, ...values, ...trend),
       range = max - min || 1;
@@ -3791,7 +3789,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
     const y = value => top + ((max - value) * plotHeight) / range;
     const yTicks = [max, round((max + min) / 2), min];
     const xIndexes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])];
-    const coordinates = points.map((point, index) => ({ x: x(index), y: y(point.average) }));
+    const coordinates = values.map((value, index) => ({ x: x(index), y: y(value) }));
     const linePath = smoothSvgPath(coordinates);
     const baseline = height - bottom;
     const areaPath = `${linePath} L ${coordinates.at(-1).x.toFixed(1)} ${baseline} L ${coordinates[0].x.toFixed(1)} ${baseline} Z`;
@@ -3799,7 +3797,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       ? `M ${x(0).toFixed(1)} ${y(trend[0]).toFixed(1)} L ${x(points.length - 1).toFixed(1)} ${y(trend[1]).toFixed(1)}`
       : '';
     const gradientId = `chart-gradient-${++gradientNumber}`;
-    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Smoothed three-month rolling average chart with trend line"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".18"/><stop offset="55%" stop-color="${color}" stop-opacity=".07"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<path class="chart-gradient-area" d="${areaPath}" fill="url(#${gradientId})"/><line class="chart-axis" x1="${left}" x2="${width - right}" y1="${baseline}" y2="${baseline}"/><path d="${trendPath}" fill="none" stroke="${color}" stroke-opacity=".5" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/><path class="chart-line" pathLength="1" d="${linePath}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(point.average)}" r="3.5" fill="${color}"/><circle class="chart-point" data-chart-label="${escapeHtml(point.label)}" data-chart-value="${money(point.value)}" data-chart-average="${money(point.average)}" cx="${x(index)}" cy="${y(point.average)}" r="13" fill="${color}" fill-opacity=".001"/></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${baseline}" y2="${baseline + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${chartSeriesLabel()} chart with trend line"><defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".18"/><stop offset="55%" stop-color="${color}" stop-opacity=".07"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${yTicks.map(value => `<g><line class="chart-grid-line" x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis-label" x="${left - 8}" y="${y(value) + 4}" text-anchor="end">${money(value)}</text></g>`).join('')}<path class="chart-gradient-area" d="${areaPath}" fill="url(#${gradientId})"/><line class="chart-axis" x1="${left}" x2="${width - right}" y1="${baseline}" y2="${baseline}"/><path d="${trendPath}" fill="none" stroke="${color}" stroke-opacity=".5" stroke-width="3" stroke-dasharray="7 6" stroke-linecap="round"/><path class="chart-line" pathLength="1" d="${linePath}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>${points.map((point, index) => `<g><circle cx="${x(index)}" cy="${y(values[index])}" r="3.5" fill="${color}"/><circle class="chart-point" data-chart-label="${escapeHtml(point.label)}" data-chart-value="${money(point.value)}"${showRollingAverage ? ` data-chart-average="${money(values[index])}"` : ''} cx="${x(index)}" cy="${y(values[index])}" r="13" fill="${color}" fill-opacity=".001"/></g>`).join('')}${xIndexes.map(index => `<g><line class="chart-axis" x1="${x(index)}" x2="${x(index)}" y1="${baseline}" y2="${baseline + 5}"/><text class="chart-axis-label" x="${x(index)}" y="${height - 15}" text-anchor="middle">${points[index].label.split(' ')[0].slice(0, 3)} ${points[index].label.split(' ').at(-1)}</text></g>`).join('')}</svg>`;
   };
   render();
 })();
@@ -5413,7 +5411,7 @@ function travelYearTotal(year, throughMonth = '12') {
   showChartTooltip = (point, event) => {
     const secondaryLabel = point.dataset.chartSecondaryLabel || '3-month average';
     const secondaryValue = point.dataset.chartSecondaryValue || point.dataset.chartAverage;
-    chartTooltip.innerHTML = `<b>${escapeHtml(point.dataset.chartLabel)}</b><span>${escapeHtml(point.dataset.chartValue)}</span><span>${escapeHtml(secondaryLabel)}: ${escapeHtml(secondaryValue)}</span>`;
+    chartTooltip.innerHTML = `<b>${escapeHtml(point.dataset.chartLabel)}</b><span>${escapeHtml(point.dataset.chartValue)}</span>${secondaryValue ? `<span>${escapeHtml(secondaryLabel)}: ${escapeHtml(secondaryValue)}</span>` : ''}`;
     const gap = 14,
       width = chartTooltip.offsetWidth,
       height = chartTooltip.offsetHeight;
